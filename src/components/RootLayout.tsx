@@ -8,7 +8,7 @@ import { useChatStore } from '@/store';
 import { useEffect } from 'react';
 
 export function RootComponent() {
-  const { isConnected, isLeader } = useConnection();
+  const { isConnected } = useConnection();
   const account = useChatStore((s) => s.account);
   const initialized = useChatStore((s) => s.initialized);
   const navigate = useNavigate();
