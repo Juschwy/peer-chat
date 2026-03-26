@@ -17,6 +17,7 @@
     "@mui/material": "^7.3.9",
     "@tanstack/react-router": "^1.168.5",
     "peerjs": "^1.5.5",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "uuid": "^13.0.0",

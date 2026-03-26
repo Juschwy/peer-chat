@@ -11,9 +11,11 @@ import {
   Tooltip,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
 import { useChatStore } from '@/store';
 import { useNotification } from '@/hooks';
 import { UserAvatar } from './UserAvatar';
+import { ShareDialog } from './ShareDialog';
 
 interface ProfileDialogProps {
   open: boolean;
@@ -24,6 +26,7 @@ export function ProfileDialog({ open, onClose }: ProfileDialogProps) {
   const account = useChatStore((s) => s.account);
   const { notify } = useNotification();
   const [copied, setCopied] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   if (!account) return null;
 
@@ -39,30 +42,40 @@ export function ProfileDialog({ open, onClose }: ProfileDialogProps) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>My Profile</DialogTitle>
-      <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 2 }}>
-          <UserAvatar name={account.name} size={80} />
-          <Typography variant="h6">{account.name}</Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-              {account.id}
+    <>
+      <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+        <DialogTitle>My Profile</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 2 }}>
+            <UserAvatar name={account.name} size={80} />
+            <Typography variant="h6">{account.name}</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>
+                {account.id}
+              </Typography>
+              <Tooltip title={copied ? 'Copied!' : 'Copy Peer ID'}>
+                <IconButton size="small" onClick={handleCopy}>
+                  <ContentCopyIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Typography variant="caption" color="text.secondary" textAlign="center">
+              Share your Peer ID or QR code so others can connect with you.
             </Typography>
-            <Tooltip title={copied ? 'Copied!' : 'Copy Peer ID'}>
-              <IconButton size="small" onClick={handleCopy}>
-                <ContentCopyIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            <Button
+              variant="outlined"
+              startIcon={<QrCode2Icon />}
+              onClick={() => setShareOpen(true)}
+            >
+              Share QR Code
+            </Button>
           </Box>
-          <Typography variant="caption" color="text.secondary">
-            Share your Peer ID with others so they can connect with you.
-          </Typography>
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Close</Button>
-      </DialogActions>
-    </Dialog>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose}>Close</Button>
+        </DialogActions>
+      </Dialog>
+      <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} />
+    </>
   );
 }

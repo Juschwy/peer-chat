@@ -13,7 +13,7 @@ export default defineConfig({
         name: 'Peer Chat',
         short_name: 'PeerChat',
         description: 'Decentralized peer-to-peer messaging',
-        theme_color: '#6366f1',
+        theme_color: '#3b82f6',
         background_color: '#0f172a',
         display: 'standalone',
         orientation: 'portrait',

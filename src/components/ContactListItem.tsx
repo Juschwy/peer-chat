@@ -26,6 +26,8 @@ export function ContactListItem({
   unreadCount,
   onClick,
 }: ContactListItemProps) {
+  const displayName = contact.nickname || contact.name;
+
   const preview = useMemo(() => {
     if (!lastMessage) return 'No messages yet';
     const text = lastMessage.textContent;
@@ -46,7 +48,7 @@ export function ContactListItem({
     <ListItem disablePadding>
       <ListItemButton selected={selected} onClick={onClick} sx={{ py: 1.5 }}>
         <ListItemAvatar>
-          <OnlineAvatar name={contact.name} avatar={contact.avatar} online={online} />
+          <OnlineAvatar name={displayName} avatar={contact.avatar} online={online} />
         </ListItemAvatar>
         <ListItemText
           primary={
@@ -55,20 +57,22 @@ export function ContactListItem({
               fontWeight={unreadCount > 0 ? 700 : 400}
               noWrap
             >
-              {contact.name}
+              {displayName}
             </Typography>
           }
           secondary={
             <>
-              <Typography
-                variant="caption"
-                color="text.disabled"
-                noWrap
-                component="span"
-                sx={{ display: 'block', fontFamily: 'monospace', fontSize: '0.65rem' }}
-              >
-                {contact.id.substring(0, 8)}…
-              </Typography>
+              {contact.nickname && (
+                <Typography
+                  variant="caption"
+                  color="text.disabled"
+                  noWrap
+                  component="span"
+                  sx={{ display: 'block', fontSize: '0.7rem' }}
+                >
+                  {contact.name}
+                </Typography>
+              )}
               <Typography variant="body2" color="text.secondary" noWrap component="span" sx={{ display: 'block' }}>
                 {preview}
               </Typography>

@@ -6,6 +6,7 @@ import {
   DialogActions,
   TextField,
   Button,
+  Typography,
 } from '@mui/material';
 import { useChatStore } from '@/store';
 import { useNotification } from '@/hooks';
@@ -19,35 +20,37 @@ interface AddContactDialogProps {
 
 export function AddContactDialog({ open, onClose }: AddContactDialogProps) {
   const [peerId, setPeerId] = useState('');
-  const [name, setName] = useState('');
+  const [nickname, setNickname] = useState('');
   const addContact = useChatStore((s) => s.addContact);
   const { notify } = useNotification();
 
   const handleAdd = async () => {
     const trimmedId = peerId.trim();
-    const trimmedName = name.trim();
-    if (!trimmedId || !trimmedName) {
-      notify('Please fill in all fields', 'warning');
+    if (!trimmedId) {
+      notify('Please enter a Peer ID', 'warning');
       return;
     }
+
+    const trimmedNickname = nickname.trim();
 
     try {
       const contact = ContactSchema.parse({
         id: trimmedId,
-        name: trimmedName,
+        name: trimmedId.substring(0, 8),  // Provisional name, will be updated by ping
+        nickname: trimmedNickname || undefined,
         avatar: '',
         publicKey: trimmedId,
       });
       await addContact(contact);
 
-      // Try to connect to the peer
+      // Try to connect to the peer to get their real name via ping
       connectionManager.connectToPeer(trimmedId).catch(() => {
         // Peer might be offline
       });
 
-      notify(`Contact "${trimmedName}" added!`, 'success');
+      notify('Contact added! Connecting…', 'success');
       setPeerId('');
-      setName('');
+      setNickname('');
       onClose();
     } catch {
       notify('Invalid contact data', 'error');
@@ -70,12 +73,16 @@ export function AddContactDialog({ open, onClose }: AddContactDialogProps) {
         />
         <TextField
           margin="dense"
-          label="Display Name"
+          label="Nickname (optional)"
           fullWidth
           variant="outlined"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={nickname}
+          onChange={(e) => setNickname(e.target.value)}
+          helperText="Give them a custom name, or leave blank"
         />
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+          Their username will be fetched automatically when they come online.
+        </Typography>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>

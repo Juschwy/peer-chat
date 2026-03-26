@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography, IconButton, useMediaQuery, useTheme } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate } from '@tanstack/react-router';
@@ -7,6 +7,7 @@ import { connectionManager } from '@/connection';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { OnlineAvatar } from './OnlineAvatar';
+import { ContactInfoDialog } from './ContactInfoDialog';
 
 interface ChatAreaProps {
   chatId: string;
@@ -20,6 +21,7 @@ export function ChatArea({ chatId }: ChatAreaProps) {
   const muiTheme = useTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
   const navigate = useNavigate();
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const contact = useMemo(
     () => contacts.find((c) => c.id === chatId),
@@ -57,6 +59,8 @@ export function ChatArea({ chatId }: ChatAreaProps) {
     );
   }
 
+  const displayName = contact.nickname || contact.name;
+
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Chat header */}
@@ -68,26 +72,36 @@ export function ChatArea({ chatId }: ChatAreaProps) {
           p: 1.5,
           borderBottom: 1,
           borderColor: 'divider',
+          cursor: 'pointer',
         }}
+        onClick={() => setInfoOpen(true)}
       >
         {isMobile && (
-          <IconButton size="small" onClick={() => navigate({ to: '/chats' })}>
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate({ to: '/chats' });
+            }}
+          >
             <ArrowBackIcon />
           </IconButton>
         )}
-        <OnlineAvatar name={contact.name} avatar={contact.avatar} online={isOnline} size={36} />
+        <OnlineAvatar name={displayName} avatar={contact.avatar} online={isOnline} size={36} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="subtitle1" fontWeight={600} noWrap>
-            {contact.name}
+            {displayName}
           </Typography>
-          <Typography
-            variant="caption"
-            color="text.disabled"
-            noWrap
-            sx={{ fontFamily: 'monospace', fontSize: '0.65rem' }}
-          >
-            {contact.id}
-          </Typography>
+          {contact.nickname && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              noWrap
+              sx={{ fontSize: '0.7rem' }}
+            >
+              {contact.name}
+            </Typography>
+          )}
         </Box>
         <Typography variant="caption" color={isOnline ? 'success.main' : 'text.disabled'}>
           {isOnline ? 'Online' : 'Offline'}
@@ -99,6 +113,14 @@ export function ChatArea({ chatId }: ChatAreaProps) {
 
       {/* Input */}
       <MessageInput onSend={handleSend} />
+
+      {/* Contact info dialog */}
+      <ContactInfoDialog
+        open={infoOpen}
+        onClose={() => setInfoOpen(false)}
+        contact={contact}
+        online={isOnline}
+      />
     </Box>
   );
 }

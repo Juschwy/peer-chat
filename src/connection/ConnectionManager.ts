@@ -274,21 +274,35 @@ class ConnectionManager {
         break;
 
       case 'MESSAGE_RETURN_RECEIVED': {
-        const content = envelope.content as { messageId: string; receivedTimestamp: string };
-        if (content?.messageId) {
-          useChatStore.getState().updateMessage(content.messageId, {
-            receivedTimestamp: new Date(content.receivedTimestamp),
-          });
+        const content = envelope.content as { messageId?: string; receivedTimestamp?: string } | null;
+        console.debug(`[PeerChat] MESSAGE_RETURN_RECEIVED from ${fromPeerId}:`, content);
+        if (content?.messageId && content?.receivedTimestamp) {
+          const existing = useChatStore.getState().messages.find((m) => m.id === content.messageId);
+          if (existing) {
+            useChatStore.getState().updateMessage(content.messageId, {
+              receivedTimestamp: new Date(content.receivedTimestamp),
+            });
+            console.debug(`[PeerChat] Updated message ${content.messageId} with receivedTimestamp`);
+          } else {
+            console.debug(`[PeerChat] Message ${content.messageId} not found in store for received ack`);
+          }
         }
         break;
       }
 
       case 'MESSAGE_RETURN_READ': {
-        const content = envelope.content as { messageId: string; readTimestamp: string };
-        if (content?.messageId) {
-          useChatStore.getState().updateMessage(content.messageId, {
-            readTimestamp: new Date(content.readTimestamp),
-          });
+        const content = envelope.content as { messageId?: string; readTimestamp?: string } | null;
+        console.debug(`[PeerChat] MESSAGE_RETURN_READ from ${fromPeerId}:`, content);
+        if (content?.messageId && content?.readTimestamp) {
+          const existing = useChatStore.getState().messages.find((m) => m.id === content.messageId);
+          if (existing) {
+            useChatStore.getState().updateMessage(content.messageId, {
+              readTimestamp: new Date(content.readTimestamp),
+            });
+            console.debug(`[PeerChat] Updated message ${content.messageId} with readTimestamp`);
+          } else {
+            console.debug(`[PeerChat] Message ${content.messageId} not found in store for read ack`);
+          }
         }
         break;
       }
@@ -337,7 +351,7 @@ class ConnectionManager {
         publicKey: peerId,
       });
     } else if (existing.name !== name) {
-      // Update name if it changed
+      // Update the remote name if it changed (don't touch nickname)
       console.debug(`[PeerChat] Updating contact name: ${existing.name} → ${name} (${peerId})`);
       store.updateContact(peerId, { name });
     }
@@ -367,11 +381,22 @@ class ConnectionManager {
 
     useChatStore.getState().addMessage(withReceived);
 
-    // Send received acknowledgement
-    this.sendToPeer(fromPeerId, {
+    // Send received acknowledgement — use the connection we already have
+    // (the message just arrived over it, so it must be open)
+    const ack: PeerMessage = {
       type: 'MESSAGE_RETURN_RECEIVED',
       content: { messageId: message.id, receivedTimestamp: now.toISOString() },
-    });
+    };
+    console.debug(`[PeerChat] Sending MESSAGE_RETURN_RECEIVED for ${message.id} to ${fromPeerId}`);
+    const conn = this.connections.get(fromPeerId);
+    if (conn && conn.open) {
+      logDebug('SEND', fromPeerId, ack);
+      conn.send(ack);
+    } else {
+      // Fallback: try sendToPeer which will attempt to reconnect
+      console.debug(`[PeerChat] No open connection to ${fromPeerId} for ack, falling back to sendToPeer`);
+      this.sendToPeer(fromPeerId, ack);
+    }
   }
 
   private ensureContactFromMessage(peerId: string) {
@@ -419,10 +444,10 @@ class ConnectionManager {
     // Store in state (persists via store middleware)
     store.addMessage(result.data);
 
-    // Send via PeerJS
+    // Send via PeerJS — serialize to plain object to ensure Date → ISO string
     const peerMessage: PeerMessage = {
       type: 'MESSAGE_SEND',
-      content: result.data,
+      content: JSON.parse(JSON.stringify(result.data)),
     };
     this.sendToPeer(receiverId, peerMessage);
 
@@ -470,13 +495,25 @@ class ConnectionManager {
       (m) => m.senderId === contactId && m.receiverId === account.id && !m.readTimestamp,
     );
 
+    if (unread.length === 0) return;
+
     const now = new Date();
+    const conn = this.connections.get(contactId);
+    const canSendDirect = conn && conn.open;
+
     for (const msg of unread) {
       store.updateMessage(msg.id, { readTimestamp: now });
-      this.sendToPeer(contactId, {
+      const readAck: PeerMessage = {
         type: 'MESSAGE_RETURN_READ',
         content: { messageId: msg.id, readTimestamp: now.toISOString() },
-      });
+      };
+      console.debug(`[PeerChat] Sending MESSAGE_RETURN_READ for ${msg.id} to ${contactId}`);
+      if (canSendDirect) {
+        logDebug('SEND', contactId, readAck);
+        conn.send(readAck);
+      } else {
+        this.sendToPeer(contactId, readAck);
+      }
     }
   }
 
