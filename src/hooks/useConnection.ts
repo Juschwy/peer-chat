@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { connectionManager } from '@/connection';
-import { useChatStore } from '@/store';
+import { connectionManager } from '@/connection/ConnectionManager';
+import { useChatStore } from '@/store/chatStore';
 import { useNotification } from '@/hooks/notificationContext';
 import { useIsLeaderTab } from '@/hooks/useTabLeader';
 

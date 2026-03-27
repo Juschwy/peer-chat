@@ -1,16 +1,38 @@
-import { createRoute } from '@tanstack/react-router';
-import { ChatsLayout } from '@/components/ChatsLayout';
-import { EmptyChatArea } from '@/components';
-import { rootRoute } from './root';
+import { createFileRoute, Outlet, useParams } from '@tanstack/react-router';
+import { Box, useMediaQuery, useTheme } from '@mui/material';
+import { Sidebar } from '@/components/Sidebar';
 
-export const chatsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/chats',
+function ChatsLayout() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const params = useParams({ strict: false }) as { chatId?: string };
+  const hasChatOpen = !!params.chatId;
+
+  if (isMobile) {
+    return (
+      <Box sx={{ display: 'flex', height: '100%' }}>
+        {!hasChatOpen ? (
+          <Box sx={{ width: '100%', height: '100%' }}>
+            <Sidebar />
+          </Box>
+        ) : (
+          <Box sx={{ flex: 1, height: '100%' }}>
+            <Outlet />
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ display: 'flex', height: '100%' }}>
+      <Sidebar />
+      <Outlet />
+    </Box>
+  );
+}
+
+export const Route = createFileRoute('/chats')({
   component: ChatsLayout,
 });
 
-export const chatsIndexRoute = createRoute({
-  getParentRoute: () => chatsRoute,
-  path: '/',
-  component: EmptyChatArea,
-});

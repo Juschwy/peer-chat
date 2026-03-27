@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography, IconButton, useMediaQuery, useTheme } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import PhoneIcon from '@mui/icons-material/Phone';
+import VideocamIcon from '@mui/icons-material/Videocam';
 import { useNavigate } from '@tanstack/react-router';
-import { useChatStore } from '@/store';
-import { connectionManager } from '@/connection';
-import { MessageList } from './MessageList';
-import { MessageInput } from './MessageInput';
-import { OnlineAvatar } from './OnlineAvatar';
-import { ContactInfoDialog } from './ContactInfoDialog';
+import { useChatStore } from '@/store/chatStore';
+import { connectionManager } from '@/connection/ConnectionManager';
+import { MessageList } from '@/components/MessageList';
+import { MessageInput } from '@/components/MessageInput';
+import { OnlineAvatar } from '@/components/OnlineAvatar';
+import { ContactInfoDialog } from '@/components/ContactInfoDialog';
 
 interface ChatAreaProps {
   chatId: string;
@@ -23,10 +25,7 @@ export function ChatArea({ chatId }: ChatAreaProps) {
   const navigate = useNavigate();
   const [infoOpen, setInfoOpen] = useState(false);
 
-  const contact = useMemo(
-    () => contacts.find((c) => c.id === chatId),
-    [contacts, chatId],
-  );
+  const contact = useMemo(() => contacts.find((c) => c.id === chatId), [contacts, chatId]);
 
   const chatMessages = useMemo(() => {
     if (!account) return [];
@@ -47,8 +46,8 @@ export function ChatArea({ chatId }: ChatAreaProps) {
     connectionManager.markMessagesAsRead(chatId);
   }, [chatId, chatMessages.length, account]);
 
-  const handleSend = (text: string) => {
-    connectionManager.sendMessage(chatId, text);
+  const handleSend = (text: string, attachments?: import('@/schemas/message').FileAttachment[]) => {
+    connectionManager.sendMessage(chatId, text, attachments);
   };
 
   if (!contact) {
@@ -63,64 +62,60 @@ export function ChatArea({ chatId }: ChatAreaProps) {
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Chat header */}
+      {/* Header */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          gap: 1.5,
+          gap: 1,
           p: 1.5,
           borderBottom: 1,
           borderColor: 'divider',
-          cursor: 'pointer',
         }}
-        onClick={() => setInfoOpen(true)}
       >
         {isMobile && (
-          <IconButton
-            size="small"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate({ to: '/chats' });
-            }}
-          >
+          <IconButton size="small" onClick={() => navigate({ to: '/chats' })}>
             <ArrowBackIcon />
           </IconButton>
         )}
-        <OnlineAvatar name={displayName} avatar={contact.avatar} online={isOnline} size={36} />
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="subtitle1" fontWeight={600} noWrap>
-            {displayName}
-          </Typography>
-          {contact.nickname && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              noWrap
-              sx={{ fontSize: '0.7rem' }}
-            >
-              {contact.name}
+        <Box
+          sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, cursor: 'pointer', minWidth: 0 }}
+          onClick={() => setInfoOpen(true)}
+        >
+          <OnlineAvatar name={displayName} avatar={contact.avatar} online={isOnline} size={36} />
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="subtitle1" fontWeight={600} noWrap>
+              {displayName}
             </Typography>
-          )}
+            {contact.nickname && (
+              <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.7rem' }}>
+                {contact.name}
+              </Typography>
+            )}
+          </Box>
         </Box>
-        <Typography variant="caption" color={isOnline ? 'success.main' : 'text.disabled'}>
+        {isOnline && (
+          <>
+            <IconButton size="small" onClick={() => connectionManager.startCall(chatId, 'audio')}>
+              <PhoneIcon fontSize="small" />
+            </IconButton>
+            <IconButton size="small" onClick={() => connectionManager.startCall(chatId, 'video')}>
+              <VideocamIcon fontSize="small" />
+            </IconButton>
+          </>
+        )}
+        <Typography variant="caption" color={isOnline ? 'success.main' : 'text.disabled'} sx={{ ml: 0.5 }}>
           {isOnline ? 'Online' : 'Offline'}
         </Typography>
       </Box>
 
       {/* Messages */}
       <MessageList messages={chatMessages} accountId={account?.id ?? ''} />
-
       {/* Input */}
       <MessageInput onSend={handleSend} />
 
       {/* Contact info dialog */}
-      <ContactInfoDialog
-        open={infoOpen}
-        onClose={() => setInfoOpen(false)}
-        contact={contact}
-        online={isOnline}
-      />
+      <ContactInfoDialog open={infoOpen} onClose={() => setInfoOpen(false)} contact={contact} online={isOnline} />
     </Box>
   );
 }

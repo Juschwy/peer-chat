@@ -12,8 +12,8 @@ import {
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { QRCodeSVG } from 'qrcode.react';
-import { useChatStore } from '@/store';
-import { useNotification } from '@/hooks';
+import { useChatStore } from '@/store/chatStore';
+import { useNotification } from '@/hooks/notificationContext';
 
 interface ShareDialogProps {
   open: boolean;

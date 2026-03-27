@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
-import { RouterProvider } from '@tanstack/react-router';
-import { router } from '@/routes';
-import { useChatStore } from '@/store';
+import { RouterProvider, createRouter } from '@tanstack/react-router';
+import { routeTree } from '@/routeTree.gen';
+import { useChatStore } from '@/store/chatStore';
+
+const router = createRouter({ routeTree });
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router;
+  }
+}
 
 export function App() {
   const initialize = useChatStore((s) => s.initialize);

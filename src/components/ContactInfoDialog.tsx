@@ -16,9 +16,9 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
-import type { Contact } from '@/schemas';
-import { useChatStore } from '@/store';
-import { useNotification } from '@/hooks';
+import type { Contact } from '@/schemas/contact';
+import { useChatStore } from '@/store/chatStore';
+import { useNotification } from '@/hooks/notificationContext';
 import { OnlineAvatar } from './OnlineAvatar';
 
 interface ContactInfoDialogProps {

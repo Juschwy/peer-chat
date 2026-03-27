@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { Box, List, Typography, IconButton, Divider, Tooltip, useMediaQuery, useTheme } from '@mui/material';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import { useChatStore } from '@/store';
-import { ContactListItem } from './ContactListItem';
-import { AddContactDialog } from './AddContactDialog';
+import { useChatStore } from '@/store/chatStore';
+import { ContactListItem } from '@/components/ContactListItem';
+import { AddContactDialog } from '@/components/AddContactDialog';
 
 export function Sidebar({ onSelectContact }: { onSelectContact?: () => void } = {}) {
   const contacts = useChatStore((s) => s.contacts);

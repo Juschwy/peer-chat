@@ -1,11 +1,9 @@
 import { AppBar, Toolbar, Typography, IconButton } from '@mui/material';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
-import LightModeIcon from '@mui/icons-material/LightMode';
-import { useThemeStore } from '@/store';
+import SettingsIcon from '@mui/icons-material/Settings';
+import { useNavigate } from '@tanstack/react-router';
 
 export function MobileTopBar() {
-  const themeMode = useThemeStore((s) => s.mode);
-  const toggleTheme = useThemeStore((s) => s.toggle);
+  const navigate = useNavigate();
 
   return (
     <AppBar
@@ -17,8 +15,8 @@ export function MobileTopBar() {
         <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
           Peer Chat
         </Typography>
-        <IconButton onClick={toggleTheme} size="small">
-          {themeMode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+        <IconButton onClick={() => navigate({ to: '/settings' })} size="small">
+          <SettingsIcon fontSize="small" />
         </IconButton>
       </Toolbar>
     </AppBar>

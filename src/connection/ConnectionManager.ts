@@ -1,13 +1,14 @@
-import Peer, { type DataConnection } from 'peerjs';
+import Peer, { type DataConnection, type MediaConnection } from 'peerjs';
 import {
   PeerMessageSchema,
-  MessageSchema,
-  PingContentSchema,
   type PeerMessage,
-  type Message,
   type PingContent,
-} from '@/schemas';
-import { useChatStore } from '@/store';
+  type CallOfferContent,
+  type CallAnswerContent,
+} from '@/schemas/peerMessage';
+import { MessageSchema, type Message, type FileAttachment } from '@/schemas/message';
+import type { CallType } from '@/schemas/callRecord';
+import { useChatStore } from '@/store/chatStore';
 import { v4 as uuidv4 } from 'uuid';
 import { getIsLeader } from '@/hooks/useTabLeader';
 
@@ -22,13 +23,14 @@ function logDebug(direction: 'SEND' | 'RECV', peerId: string, data: unknown) {
 
 class ConnectionManager {
   private peer: Peer | null = null;
-  private connections: Map<string, DataConnection> = new Map();
-  private pingIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
-  private pingTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private connections = new Map<string, DataConnection>();
+  private pingIntervals = new Map<string, ReturnType<typeof setInterval>>();
+  private pingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
   private notifyFn: NotifyFn = () => {};
   private _isConnected = false;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<() => void>();
+  private activeMediaConnection: MediaConnection | null = null;
 
   get isConnected(): boolean {
     return this._isConnected;
@@ -40,50 +42,47 @@ class ConnectionManager {
 
   subscribe(fn: () => void) {
     this.listeners.add(fn);
-    return () => {
-      this.listeners.delete(fn);
-    };
+    return () => { this.listeners.delete(fn); };
   }
 
   private emit() {
     this.listeners.forEach((fn) => fn());
   }
 
-  // ─── Get own account info for pings ──────────────────────────
+  // ─── Ping Content ──────────────────────────────────────────
   private getOwnPingContent(): PingContent | null {
     const account = useChatStore.getState().account;
     if (!account) return null;
-    return { peerId: account.id, name: account.name };
+    return { peerId: account.id, name: account.name, avatar: account.avatar };
   }
 
-  // ─── Initialize ──────────────────────────────────────────────
+  // ─── Initialize ────────────────────────────────────────────
   async initialize(peerId: string): Promise<void> {
     if (!getIsLeader()) {
       this.notifyFn('Another tab is active. Connection disabled in this tab.', 'warning');
       return;
     }
-
-    if (this.peer) {
-      this.destroy();
-    }
+    if (this.peer) this.destroy();
 
     return new Promise<void>((resolve, reject) => {
-      this.peer = new Peer(peerId, {
-        debug: 1,
-      });
+      this.peer = new Peer(peerId, { debug: 1 });
 
       this.peer.on('open', () => {
-        console.debug('[PeerChat] Peer opened with id:', peerId);
+        console.debug('[PeerChat] Peer opened:', peerId);
         this._isConnected = true;
         this.emit();
-        // Ping all existing contacts to check who's online
         this.pingAllContacts();
         resolve();
       });
 
       this.peer.on('connection', (conn) => {
         console.debug('[PeerChat] Incoming connection from:', conn.peer);
-        this.handleIncomingConnection(conn);
+        this.setupDataConnection(conn);
+      });
+
+      this.peer.on('call', (mediaConn) => {
+        console.debug('[PeerChat] Incoming media call from:', mediaConn.peer);
+        this.handleIncomingCall(mediaConn);
       });
 
       this.peer.on('disconnected', () => {
@@ -95,90 +94,37 @@ class ConnectionManager {
 
       this.peer.on('error', (err) => {
         console.error('[PeerChat] Peer error:', err);
-        if (err.type === 'unavailable-id') {
-          this.notifyFn('Peer ID already in use. Try refreshing.', 'error');
-        }
+        this.notifyFn(
+          err.type === 'unavailable-id'
+            ? 'Peer ID already in use. Try refreshing.'
+            : `Connection error: ${err.message || err.type}`,
+          'error',
+        );
         this._isConnected = false;
         this.emit();
         reject(err);
       });
 
       this.peer.on('close', () => {
-        console.debug('[PeerChat] Peer closed');
         this._isConnected = false;
         this.emit();
       });
     });
   }
 
-  // ─── Ping all contacts on startup ───────────────────────────
-  private pingAllContacts() {
-    const store = useChatStore.getState();
-    const contacts = store.contacts;
-    console.debug(`[PeerChat] Pinging ${contacts.length} existing contacts...`);
-    for (const contact of contacts) {
-      this.connectAndPing(contact.id);
-    }
-  }
-
-  private connectAndPing(peerId: string) {
-    this.connectToPeer(peerId)
-      .then(() => {
-        console.debug(`[PeerChat] Connected to ${peerId}, sending PING_SEND`);
-        this.sendPing(peerId);
-      })
-      .catch(() => {
-        console.debug(`[PeerChat] Could not reach ${peerId}, marking offline`);
-        useChatStore.getState().setPeerOffline(peerId);
-        this.emit();
-      });
-  }
-
-  // ─── Send a ping with account info ──────────────────────────
-  private sendPing(peerId: string) {
-    const content = this.getOwnPingContent();
-    if (!content) return;
-    const msg: PeerMessage = { type: 'PING_SEND', content };
-    this.sendToPeerDirect(peerId, msg);
-  }
-
-  // ─── Send a pong (ping reply) with account info ─────────────
-  private sendPingReply(peerId: string) {
-    const content = this.getOwnPingContent();
-    if (!content) return;
-    const msg: PeerMessage = { type: 'PING_RECEIVE', content };
-    this.sendToPeerDirect(peerId, msg);
-  }
-
-  private attemptReconnect() {
-    if (this.reconnectTimeout) return;
-    this.reconnectTimeout = setTimeout(() => {
-      this.reconnectTimeout = null;
-      if (this.peer && !this.peer.destroyed && !this.peer.disconnected) return;
-      if (this.peer && !this.peer.destroyed) {
-        console.debug('[PeerChat] Attempting reconnect...');
-        this.peer.reconnect();
-      }
-    }, 3000);
-  }
-
-  private handleIncomingConnection(conn: DataConnection) {
-    conn.on('open', () => {
-      this.registerConnection(conn);
-    });
-
+  // ─── Data Connection Setup ─────────────────────────────────
+  private setupDataConnection(conn: DataConnection) {
+    conn.on('open', () => this.registerConnection(conn));
     conn.on('error', (err) => {
-      console.error('[PeerChat] Incoming connection error:', err);
+      console.error('[PeerChat] Connection error:', err);
+      this.notifyFn(`Connection error with ${conn.peer.substring(0, 8)}…`, 'error');
     });
   }
 
   private registerConnection(conn: DataConnection) {
     const peerId = conn.peer;
-    // Close existing connection to same peer
     const existing = this.connections.get(peerId);
-    if (existing && existing !== conn) {
-      existing.close();
-    }
+    if (existing && existing !== conn) existing.close();
 
     this.connections.set(peerId, conn);
     useChatStore.getState().setPeerOnline(peerId);
@@ -190,344 +136,60 @@ class ConnectionManager {
       this.handleMessage(peerId, data);
     });
 
-    conn.on('close', () => {
-      console.debug(`[PeerChat] Connection closed: ${peerId}`);
-      this.connections.delete(peerId);
-      this.stopPing(peerId);
-      this.clearPingTimeout(peerId);
-      useChatStore.getState().setPeerOffline(peerId);
-      this.emit();
-    });
+    conn.on('close', () => this.handleConnectionLost(peerId));
+    conn.on('error', () => this.handleConnectionLost(peerId));
+  }
 
-    conn.on('error', (err) => {
-      console.error(`[PeerChat] Connection error with ${peerId}:`, err);
-      this.connections.delete(peerId);
-      this.stopPing(peerId);
-      this.clearPingTimeout(peerId);
-      useChatStore.getState().setPeerOffline(peerId);
-      this.emit();
-    });
+  private handleConnectionLost(peerId: string) {
+    this.connections.delete(peerId);
+    this.stopPing(peerId);
+    useChatStore.getState().setPeerOffline(peerId);
+    this.emit();
   }
 
   connectToPeer(peerId: string): Promise<DataConnection> {
     return new Promise((resolve, reject) => {
-      if (!this.peer) {
-        reject(new Error('Peer not initialized'));
-        return;
-      }
+      if (!this.peer) return reject(new Error('Peer not initialized'));
 
       const existing = this.connections.get(peerId);
-      if (existing && existing.open) {
-        resolve(existing);
-        return;
-      }
+      if (existing?.open) return resolve(existing);
 
-      console.debug(`[PeerChat] Connecting to peer: ${peerId}`);
       const conn = this.peer.connect(peerId, { reliable: true });
-
-      conn.on('open', () => {
-        this.registerConnection(conn);
-        resolve(conn);
-      });
-
-      conn.on('error', (err) => {
-        reject(err);
-      });
-
-      // Timeout
-      setTimeout(() => {
-        if (!conn.open) {
-          conn.close();
-          reject(new Error('Connection timeout'));
-        }
-      }, 10000);
+      conn.on('open', () => { this.registerConnection(conn); resolve(conn); });
+      conn.on('error', reject);
+      setTimeout(() => { if (!conn.open) { conn.close(); reject(new Error('Connection timeout')); } }, 10000);
     });
   }
 
-  // ─── Message handling ────────────────────────────────────────
-  private handleMessage(fromPeerId: string, rawData: unknown) {
-    // Validate envelope
-    const envelopeResult = PeerMessageSchema.safeParse(rawData);
-    if (!envelopeResult.success) {
-      console.debug('[PeerChat] Invalid envelope from', fromPeerId, envelopeResult.error);
-      this.notifyFn('Received invalid message format', 'error');
-      this.sendToPeer(fromPeerId, {
-        type: 'MESSAGE_RETURN_INVALID',
-        content: { reason: 'Invalid message format' },
-      });
-      return;
-    }
-
-    const envelope = envelopeResult.data;
-
-    switch (envelope.type) {
-      case 'PING_SEND':
-        this.handlePingSend(fromPeerId, envelope.content);
-        break;
-
-      case 'PING_RECEIVE':
-        this.handlePingReceive(fromPeerId, envelope.content);
-        break;
-
-      case 'MESSAGE_SEND':
-        this.handleIncomingChatMessage(fromPeerId, envelope.content);
-        break;
-
-      case 'MESSAGE_RETURN_RECEIVED': {
-        const content = envelope.content as { messageId?: string; receivedTimestamp?: string } | null;
-        console.debug(`[PeerChat] MESSAGE_RETURN_RECEIVED from ${fromPeerId}:`, content);
-        if (content?.messageId && content?.receivedTimestamp) {
-          const existing = useChatStore.getState().messages.find((m) => m.id === content.messageId);
-          if (existing) {
-            useChatStore.getState().updateMessage(content.messageId, {
-              receivedTimestamp: new Date(content.receivedTimestamp),
-            });
-            console.debug(`[PeerChat] Updated message ${content.messageId} with receivedTimestamp`);
-          } else {
-            console.debug(`[PeerChat] Message ${content.messageId} not found in store for received ack`);
-          }
-        }
-        break;
-      }
-
-      case 'MESSAGE_RETURN_READ': {
-        const content = envelope.content as { messageId?: string; readTimestamp?: string } | null;
-        console.debug(`[PeerChat] MESSAGE_RETURN_READ from ${fromPeerId}:`, content);
-        if (content?.messageId && content?.readTimestamp) {
-          const existing = useChatStore.getState().messages.find((m) => m.id === content.messageId);
-          if (existing) {
-            useChatStore.getState().updateMessage(content.messageId, {
-              readTimestamp: new Date(content.readTimestamp),
-            });
-            console.debug(`[PeerChat] Updated message ${content.messageId} with readTimestamp`);
-          } else {
-            console.debug(`[PeerChat] Message ${content.messageId} not found in store for read ack`);
-          }
-        }
-        break;
-      }
-
-      case 'MESSAGE_RETURN_INVALID':
-        this.notifyFn('Remote peer reported invalid message', 'warning');
-        break;
-
-      default:
-        break;
-    }
+  // ─── Ping Management ───────────────────────────────────────
+  private pingAllContacts() {
+    const { contacts } = useChatStore.getState();
+    for (const c of contacts) this.connectAndPing(c.id);
   }
 
-  // ─── Ping handlers ──────────────────────────────────────────
-  private handlePingSend(fromPeerId: string, content: unknown) {
-    const parsed = PingContentSchema.safeParse(content);
-    if (parsed.success) {
-      this.ensureContact(fromPeerId, parsed.data.name);
-    }
-    useChatStore.getState().setPeerOnline(fromPeerId);
-    this.clearPingTimeout(fromPeerId);
-    // Reply with our own info
-    this.sendPingReply(fromPeerId);
+  private connectAndPing(peerId: string) {
+    this.connectToPeer(peerId)
+      .then(() => this.sendPing(peerId))
+      .catch(() => { useChatStore.getState().setPeerOffline(peerId); this.emit(); });
   }
 
-  private handlePingReceive(fromPeerId: string, content: unknown) {
-    const parsed = PingContentSchema.safeParse(content);
-    if (parsed.success) {
-      this.ensureContact(fromPeerId, parsed.data.name);
-    }
-    useChatStore.getState().setPeerOnline(fromPeerId);
-    this.clearPingTimeout(fromPeerId);
+  private sendPing(peerId: string) {
+    const content = this.getOwnPingContent();
+    if (content) this.sendDirect(peerId, { type: 'PING_SEND', content });
   }
 
-  // ─── Auto-add or update contact from ping/message ───────────
-  private ensureContact(peerId: string, name: string) {
-    const store = useChatStore.getState();
-    const existing = store.contacts.find((c) => c.id === peerId);
-    if (!existing) {
-      // Auto-add the contact
-      console.debug(`[PeerChat] Auto-adding contact: ${name} (${peerId})`);
-      store.addContact({
-        id: peerId,
-        name,
-        avatar: '',
-        publicKey: peerId,
-      });
-    } else if (existing.name !== name) {
-      // Update the remote name if it changed (don't touch nickname)
-      console.debug(`[PeerChat] Updating contact name: ${existing.name} → ${name} (${peerId})`);
-      store.updateContact(peerId, { name });
-    }
+  private sendPingReply(peerId: string) {
+    const content = this.getOwnPingContent();
+    if (content) this.sendDirect(peerId, { type: 'PING_RECEIVE', content });
   }
 
-  // ─── Incoming chat message ──────────────────────────────────
-  private handleIncomingChatMessage(fromPeerId: string, content: unknown) {
-    const result = MessageSchema.safeParse(content);
-    if (!result.success) {
-      this.notifyFn('Received invalid chat message', 'error');
-      this.sendToPeer(fromPeerId, {
-        type: 'MESSAGE_RETURN_INVALID',
-        content: { reason: 'Invalid message schema' },
-      });
-      return;
-    }
-
-    const message = result.data;
-    const now = new Date();
-    const withReceived: Message = {
-      ...message,
-      receivedTimestamp: now,
-    };
-
-    // Auto-add contact if we don't have them yet (use peerId as fallback name)
-    this.ensureContactFromMessage(fromPeerId);
-
-    useChatStore.getState().addMessage(withReceived);
-
-    // Send received acknowledgement — use the connection we already have
-    // (the message just arrived over it, so it must be open)
-    const ack: PeerMessage = {
-      type: 'MESSAGE_RETURN_RECEIVED',
-      content: { messageId: message.id, receivedTimestamp: now.toISOString() },
-    };
-    console.debug(`[PeerChat] Sending MESSAGE_RETURN_RECEIVED for ${message.id} to ${fromPeerId}`);
-    const conn = this.connections.get(fromPeerId);
-    if (conn && conn.open) {
-      logDebug('SEND', fromPeerId, ack);
-      conn.send(ack);
-    } else {
-      // Fallback: try sendToPeer which will attempt to reconnect
-      console.debug(`[PeerChat] No open connection to ${fromPeerId} for ack, falling back to sendToPeer`);
-      this.sendToPeer(fromPeerId, ack);
-    }
-  }
-
-  private ensureContactFromMessage(peerId: string) {
-    const store = useChatStore.getState();
-    const existing = store.contacts.find((c) => c.id === peerId);
-    if (!existing) {
-      // We don't have this contact — add with peerId as provisional name
-      // The name will be updated on the next ping exchange
-      console.debug(`[PeerChat] Auto-adding contact from message: ${peerId}`);
-      store.addContact({
-        id: peerId,
-        name: peerId.substring(0, 8),
-        avatar: '',
-        publicKey: peerId,
-      });
-      // Send a ping to get their real name
-      this.sendPing(peerId);
-    }
-  }
-
-  // ─── Send message ───────────────────────────────────────────
-  sendMessage(receiverId: string, textContent: string): Message | null {
-    const store = useChatStore.getState();
-    const account = store.account;
-    if (!account) {
-      this.notifyFn('No account found', 'error');
-      return null;
-    }
-
-    const message: Message = {
-      id: uuidv4(),
-      senderId: account.id,
-      receiverId,
-      sentTimestamp: new Date(),
-      textContent,
-    };
-
-    // Validate outgoing
-    const result = MessageSchema.safeParse(message);
-    if (!result.success) {
-      this.notifyFn('Invalid outgoing message', 'error');
-      return null;
-    }
-
-    // Store in state (persists via store middleware)
-    store.addMessage(result.data);
-
-    // Send via PeerJS — serialize to plain object to ensure Date → ISO string
-    const peerMessage: PeerMessage = {
-      type: 'MESSAGE_SEND',
-      content: JSON.parse(JSON.stringify(result.data)),
-    };
-    this.sendToPeer(receiverId, peerMessage);
-
-    return result.data;
-  }
-
-  // ─── Send helpers ───────────────────────────────────────────
-  /** Send to peer, trying to connect first if no open connection */
-  sendToPeer(peerId: string, message: PeerMessage) {
-    const conn = this.connections.get(peerId);
-    if (conn && conn.open) {
-      logDebug('SEND', peerId, message);
-      conn.send(message);
-    } else {
-      // Try to connect and send
-      this.connectToPeer(peerId)
-        .then((newConn) => {
-          logDebug('SEND', peerId, message);
-          newConn.send(message);
-        })
-        .catch(() => {
-          console.debug(`[PeerChat] Failed to send to ${peerId} (offline)`);
-          useChatStore.getState().setPeerOffline(peerId);
-          this.emit();
-        });
-    }
-  }
-
-  /** Send directly to an already-connected peer (no connect fallback) */
-  private sendToPeerDirect(peerId: string, message: PeerMessage) {
-    const conn = this.connections.get(peerId);
-    if (conn && conn.open) {
-      logDebug('SEND', peerId, message);
-      conn.send(message);
-    }
-  }
-
-  // ─── Read receipts ─────────────────────────────────────────
-  markMessagesAsRead(contactId: string) {
-    const store = useChatStore.getState();
-    const account = store.account;
-    if (!account) return;
-
-    const unread = store.messages.filter(
-      (m) => m.senderId === contactId && m.receiverId === account.id && !m.readTimestamp,
-    );
-
-    if (unread.length === 0) return;
-
-    const now = new Date();
-    const conn = this.connections.get(contactId);
-    const canSendDirect = conn && conn.open;
-
-    for (const msg of unread) {
-      store.updateMessage(msg.id, { readTimestamp: now });
-      const readAck: PeerMessage = {
-        type: 'MESSAGE_RETURN_READ',
-        content: { messageId: msg.id, readTimestamp: now.toISOString() },
-      };
-      console.debug(`[PeerChat] Sending MESSAGE_RETURN_READ for ${msg.id} to ${contactId}`);
-      if (canSendDirect) {
-        logDebug('SEND', contactId, readAck);
-        conn.send(readAck);
-      } else {
-        this.sendToPeer(contactId, readAck);
-      }
-    }
-  }
-
-  // ─── Ping interval management ──────────────────────────────
   private startPing(peerId: string) {
     this.stopPing(peerId);
-    // Send an initial ping immediately
     this.sendPing(peerId);
-
     const interval = setInterval(() => {
       const conn = this.connections.get(peerId);
-      if (conn && conn.open) {
+      if (conn?.open) {
         this.sendPing(peerId);
-        // Set a timeout — if no PING_RECEIVE comes back, mark offline
         this.setPingTimeout(peerId);
       } else {
         this.stopPing(peerId);
@@ -540,36 +202,379 @@ class ConnectionManager {
 
   private stopPing(peerId: string) {
     const interval = this.pingIntervals.get(peerId);
-    if (interval) {
-      clearInterval(interval);
-      this.pingIntervals.delete(peerId);
-    }
+    if (interval) { clearInterval(interval); this.pingIntervals.delete(peerId); }
     this.clearPingTimeout(peerId);
   }
 
   private setPingTimeout(peerId: string) {
     this.clearPingTimeout(peerId);
     const timeout = setTimeout(() => {
-      console.debug(`[PeerChat] Ping timeout for ${peerId}, marking offline`);
       useChatStore.getState().setPeerOffline(peerId);
       this.emit();
-      // Close the stale connection
       const conn = this.connections.get(peerId);
-      if (conn) {
-        conn.close();
-        this.connections.delete(peerId);
-      }
+      if (conn) { conn.close(); this.connections.delete(peerId); }
       this.stopPing(peerId);
-    }, 10000); // 10 second timeout for pong response
+    }, 10000);
     this.pingTimeouts.set(peerId, timeout);
   }
 
   private clearPingTimeout(peerId: string) {
     const timeout = this.pingTimeouts.get(peerId);
-    if (timeout) {
-      clearTimeout(timeout);
-      this.pingTimeouts.delete(peerId);
+    if (timeout) { clearTimeout(timeout); this.pingTimeouts.delete(peerId); }
+  }
+
+  private attemptReconnect() {
+    if (this.reconnectTimeout) return;
+    this.reconnectTimeout = setTimeout(() => {
+      this.reconnectTimeout = null;
+      if (this.peer && !this.peer.destroyed && this.peer.disconnected) {
+        this.peer.reconnect();
+      }
+    }, 3000);
+  }
+
+  // ─── Message Handling ──────────────────────────────────────
+  private handleMessage(fromPeerId: string, rawData: unknown) {
+    const result = PeerMessageSchema.safeParse(rawData);
+    if (!result.success) {
+      console.error('[PeerChat] Invalid envelope from', fromPeerId, result.error.issues);
+      this.notifyFn('Received invalid message format', 'error');
+      this.sendDirect(fromPeerId, { type: 'MESSAGE_RETURN_INVALID', content: { reason: 'Invalid format' } });
+      return;
     }
+
+    const { type, content } = result.data;
+
+    switch (type) {
+      case 'PING_SEND':
+        this.handlePing(fromPeerId, content as PingContent, true);
+        break;
+      case 'PING_RECEIVE':
+        this.handlePing(fromPeerId, content as PingContent, false);
+        break;
+      case 'MESSAGE_SEND':
+        this.handleIncomingChatMessage(fromPeerId, content as Message);
+        break;
+      case 'MESSAGE_RETURN_RECEIVED': {
+        const c = content as { messageId: string; receivedTimestamp: string };
+        this.updateMessageTimestamp(c.messageId, { receivedTimestamp: new Date(c.receivedTimestamp) });
+        break;
+      }
+      case 'MESSAGE_RETURN_READ': {
+        const c = content as { messageId: string; readTimestamp: string };
+        this.updateMessageTimestamp(c.messageId, { readTimestamp: new Date(c.readTimestamp) });
+        break;
+      }
+      case 'MESSAGE_RETURN_INVALID':
+        this.notifyFn('Remote peer reported invalid message', 'warning');
+        break;
+      case 'CALL_OFFER':
+        this.handleCallOffer(fromPeerId, content as CallOfferContent);
+        break;
+      case 'CALL_ANSWER':
+        this.handleCallAnswer(fromPeerId, content as CallAnswerContent);
+        break;
+      case 'CALL_REJECT':
+        this.handleCallReject(fromPeerId);
+        break;
+      case 'CALL_END':
+        this.handleCallEnd(fromPeerId);
+        break;
+    }
+  }
+
+  private updateMessageTimestamp(messageId: string, updates: Partial<Message>) {
+    const store = useChatStore.getState();
+    if (store.messages.find((m) => m.id === messageId)) {
+      store.updateMessage(messageId, updates);
+    }
+  }
+
+  // ─── Ping Handlers ─────────────────────────────────────────
+  private handlePing(fromPeerId: string, content: PingContent, isRequest: boolean) {
+    this.ensureContact(fromPeerId, content.name, content.avatar);
+    useChatStore.getState().setPeerOnline(fromPeerId);
+    this.clearPingTimeout(fromPeerId);
+    if (isRequest) this.sendPingReply(fromPeerId);
+    this.resendUndeliveredMessages(fromPeerId);
+  }
+
+  private ensureContact(peerId: string, name: string, avatar?: string) {
+    const store = useChatStore.getState();
+    const existing = store.contacts.find((c) => c.id === peerId);
+    if (!existing) {
+      store.addContact({ id: peerId, name, avatar: avatar ?? '', publicKey: peerId });
+    } else {
+      const updates: Record<string, string> = {};
+      if (existing.name !== name) updates.name = name;
+      if (avatar !== undefined && existing.avatar !== avatar) updates.avatar = avatar;
+      if (Object.keys(updates).length > 0) store.updateContact(peerId, updates);
+    }
+  }
+
+  // ─── Chat Message Handling ─────────────────────────────────
+  private handleIncomingChatMessage(fromPeerId: string, content: Message) {
+    const now = new Date();
+    useChatStore.getState().addMessage({ ...content, receivedTimestamp: now });
+
+    // Ensure we have a contact
+    const store = useChatStore.getState();
+    if (!store.contacts.find((c) => c.id === fromPeerId)) {
+      store.addContact({ id: fromPeerId, name: fromPeerId.substring(0, 8), avatar: '', publicKey: fromPeerId });
+      this.sendPing(fromPeerId);
+    }
+
+    // Send received ack
+    const ack: PeerMessage = {
+      type: 'MESSAGE_RETURN_RECEIVED',
+      content: { messageId: content.id, receivedTimestamp: now.toISOString() },
+    };
+    this.sendDirect(fromPeerId, ack) || this.sendToPeer(fromPeerId, ack);
+  }
+
+  private resendUndeliveredMessages(peerId: string) {
+    const { account, messages } = useChatStore.getState();
+    if (!account) return;
+    const undelivered = messages.filter(
+      (m) => m.senderId === account.id && m.receiverId === peerId && !m.receivedTimestamp,
+    );
+    for (const msg of undelivered) {
+      this.sendDirect(peerId, { type: 'MESSAGE_SEND', content: JSON.parse(JSON.stringify(msg)) });
+    }
+  }
+
+  // ─── Send Message ──────────────────────────────────────────
+  sendMessage(receiverId: string, textContent: string, attachments?: FileAttachment[]): Message | null {
+    const { account } = useChatStore.getState();
+    if (!account) { this.notifyFn('No account found', 'error'); return null; }
+
+    const message: Message = {
+      id: uuidv4(),
+      senderId: account.id,
+      receiverId,
+      sentTimestamp: new Date(),
+      textContent,
+      attachments: attachments?.length ? attachments : undefined,
+    };
+
+    const result = MessageSchema.safeParse(message);
+    if (!result.success) {
+      this.notifyFn('Invalid outgoing message', 'error');
+      return null;
+    }
+
+    useChatStore.getState().addMessage(result.data);
+    this.sendToPeer(receiverId, { type: 'MESSAGE_SEND', content: JSON.parse(JSON.stringify(result.data)) });
+    return result.data;
+  }
+
+  // ─── Read Receipts ─────────────────────────────────────────
+  markMessagesAsRead(contactId: string) {
+    const { account, messages } = useChatStore.getState();
+    if (!account) return;
+
+    const unread = messages.filter(
+      (m) => m.senderId === contactId && m.receiverId === account.id && !m.readTimestamp,
+    );
+    if (!unread.length) return;
+
+    const now = new Date();
+    for (const msg of unread) {
+      useChatStore.getState().updateMessage(msg.id, { readTimestamp: now });
+      const ack: PeerMessage = { type: 'MESSAGE_RETURN_READ', content: { messageId: msg.id, readTimestamp: now.toISOString() } };
+      this.sendDirect(contactId, ack) || this.sendToPeer(contactId, ack);
+    }
+  }
+
+  // ─── Call Management ───────────────────────────────────────
+  async startCall(peerId: string, callType: CallType): Promise<void> {
+    if (!this.peer) { this.notifyFn('Not connected', 'error'); return; }
+    const { account } = useChatStore.getState();
+    if (!account) return;
+
+    const callId = uuidv4();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: callType === 'video',
+      });
+
+      const mediaConn = this.peer.call(peerId, stream);
+      this.activeMediaConnection = mediaConn;
+
+      useChatStore.getState().setActiveCall({
+        callId,
+        peerId,
+        type: callType,
+        direction: 'outbound',
+        status: 'ringing',
+        startedAt: new Date(),
+        localStream: stream,
+        remoteStream: null,
+      });
+
+      useChatStore.getState().addCallRecord({
+        id: callId,
+        peerId,
+        type: callType,
+        status: 'outgoing',
+        startedAt: new Date(),
+        direction: 'outbound',
+      });
+
+      // Send call offer via data channel
+      this.sendToPeer(peerId, { type: 'CALL_OFFER', content: { callId, callType } });
+
+      mediaConn.on('stream', (remoteStream) => {
+        const active = useChatStore.getState().activeCall;
+        if (active?.callId === callId) {
+          useChatStore.getState().setActiveCall({ ...active, status: 'connected', remoteStream });
+        }
+      });
+
+      mediaConn.on('close', () => this.cleanupCall(callId));
+      mediaConn.on('error', () => { this.notifyFn('Call error', 'error'); this.cleanupCall(callId); });
+    } catch (err) {
+      this.notifyFn('Could not access microphone/camera', 'error');
+      console.error('[PeerChat] getUserMedia error:', err);
+    }
+  }
+
+  private handleIncomingCall(mediaConn: MediaConnection) {
+    // Store the media connection — we'll answer it when the user accepts
+    this.activeMediaConnection = mediaConn;
+    mediaConn.on('close', () => {
+      const active = useChatStore.getState().activeCall;
+      if (active) this.cleanupCall(active.callId);
+    });
+  }
+
+  private handleCallOffer(fromPeerId: string, content: CallOfferContent) {
+    const store = useChatStore.getState();
+    if (store.activeCall) {
+      // Already in a call — reject
+      this.sendToPeer(fromPeerId, { type: 'CALL_REJECT', content: { callId: content.callId } });
+      return;
+    }
+
+    store.setActiveCall({
+      callId: content.callId,
+      peerId: fromPeerId,
+      type: content.callType,
+      direction: 'inbound',
+      status: 'ringing',
+      startedAt: new Date(),
+      localStream: null,
+      remoteStream: null,
+    });
+
+    store.addCallRecord({
+      id: content.callId,
+      peerId: fromPeerId,
+      type: content.callType,
+      status: 'missed', // Will update if answered
+      startedAt: new Date(),
+      direction: 'inbound',
+    });
+  }
+
+  async answerCall(): Promise<void> {
+    const active = useChatStore.getState().activeCall;
+    if (!active || active.direction !== 'inbound' || !this.activeMediaConnection) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: active.type === 'video',
+      });
+
+      this.activeMediaConnection.answer(stream);
+      useChatStore.getState().setActiveCall({ ...active, status: 'connected', localStream: stream });
+      useChatStore.getState().updateCallRecord(active.callId, { status: 'answered' });
+      this.sendToPeer(active.peerId, { type: 'CALL_ANSWER', content: { callId: active.callId } });
+
+      this.activeMediaConnection.on('stream', (remoteStream) => {
+        const curr = useChatStore.getState().activeCall;
+        if (curr?.callId === active.callId) {
+          useChatStore.getState().setActiveCall({ ...curr, remoteStream });
+        }
+      });
+    } catch {
+      this.notifyFn('Could not access microphone/camera', 'error');
+      this.rejectCall();
+    }
+  }
+
+  rejectCall() {
+    const active = useChatStore.getState().activeCall;
+    if (!active) return;
+    useChatStore.getState().updateCallRecord(active.callId, { status: 'rejected', endedAt: new Date() });
+    this.sendToPeer(active.peerId, { type: 'CALL_REJECT', content: { callId: active.callId } });
+    this.cleanupCall(active.callId);
+  }
+
+  endCall() {
+    const active = useChatStore.getState().activeCall;
+    if (!active) return;
+    useChatStore.getState().updateCallRecord(active.callId, { endedAt: new Date() });
+    this.sendToPeer(active.peerId, { type: 'CALL_END', content: { callId: active.callId } });
+    this.cleanupCall(active.callId);
+  }
+
+  private handleCallAnswer(_fromPeerId: string, content: CallAnswerContent) {
+    const active = useChatStore.getState().activeCall;
+    if (active?.callId === content.callId) {
+      useChatStore.getState().setActiveCall({ ...active, status: 'connected' });
+      useChatStore.getState().updateCallRecord(active.callId, { status: 'answered' });
+    }
+  }
+
+  private handleCallReject(fromPeerId: string) {
+    const active = useChatStore.getState().activeCall;
+    if (active?.peerId === fromPeerId) {
+      useChatStore.getState().updateCallRecord(active.callId, { status: 'rejected', endedAt: new Date() });
+      this.cleanupCall(active.callId);
+      this.notifyFn('Call was rejected', 'info');
+    }
+  }
+
+  private handleCallEnd(fromPeerId: string) {
+    const active = useChatStore.getState().activeCall;
+    if (active?.peerId === fromPeerId) {
+      useChatStore.getState().updateCallRecord(active.callId, { endedAt: new Date() });
+      this.cleanupCall(active.callId);
+    }
+  }
+
+  private cleanupCall(_callId: string) {
+    const active = useChatStore.getState().activeCall;
+    if (active) {
+      active.localStream?.getTracks().forEach((t) => t.stop());
+      active.remoteStream?.getTracks().forEach((t) => t.stop());
+    }
+    this.activeMediaConnection?.close();
+    this.activeMediaConnection = null;
+    useChatStore.getState().setActiveCall(null);
+  }
+
+  // ─── Send Helpers ──────────────────────────────────────────
+  sendToPeer(peerId: string, message: PeerMessage) {
+    if (!this.sendDirect(peerId, message)) {
+      this.connectToPeer(peerId)
+        .then((conn) => { logDebug('SEND', peerId, message); conn.send(message); })
+        .catch(() => { useChatStore.getState().setPeerOffline(peerId); this.emit(); });
+    }
+  }
+
+  /** Returns true if sent successfully */
+  private sendDirect(peerId: string, message: PeerMessage): boolean {
+    const conn = this.connections.get(peerId);
+    if (conn?.open) {
+      logDebug('SEND', peerId, message);
+      conn.send(message);
+      return true;
+    }
+    return false;
   }
 
   // ─── Utility ───────────────────────────────────────────────
@@ -578,29 +583,22 @@ class ConnectionManager {
   }
 
   isConnectedToPeer(peerId: string): boolean {
-    const conn = this.connections.get(peerId);
-    return !!conn && conn.open;
+    return !!this.connections.get(peerId)?.open;
   }
 
   destroy() {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-    this.pingIntervals.forEach((interval) => clearInterval(interval));
+    if (this.reconnectTimeout) { clearTimeout(this.reconnectTimeout); this.reconnectTimeout = null; }
+    this.pingIntervals.forEach((i) => clearInterval(i));
     this.pingIntervals.clear();
-    this.pingTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.pingTimeouts.forEach((t) => clearTimeout(t));
     this.pingTimeouts.clear();
-    this.connections.forEach((conn) => conn.close());
+    this.connections.forEach((c) => c.close());
     this.connections.clear();
-    if (this.peer) {
-      this.peer.destroy();
-      this.peer = null;
-    }
+    this.cleanupCall('');
+    if (this.peer) { this.peer.destroy(); this.peer = null; }
     this._isConnected = false;
     this.emit();
   }
 }
 
-// Singleton
 export const connectionManager = new ConnectionManager();

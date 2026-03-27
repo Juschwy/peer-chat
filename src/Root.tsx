@@ -1,8 +1,8 @@
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import { NotificationProvider } from '@/hooks/useNotification';
-import { useThemeStore } from '@/store';
+import { useThemeStore } from '@/store/themeStore';
 import { lightTheme, darkTheme } from '@/theme';
-import { App } from '@/App.tsx';
+import { App } from '@/App';
 
 export function Root() {
   const mode = useThemeStore((s) => s.mode);

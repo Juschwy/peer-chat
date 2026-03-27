@@ -1,13 +1,14 @@
-import { Outlet, useNavigate } from '@tanstack/react-router';
+import { createRootRoute, Outlet, useNavigate } from '@tanstack/react-router';
 import { Box, useMediaQuery, useTheme } from '@mui/material';
 import { NavRail } from '@/components/NavRail';
 import { MobileTopBar } from '@/components/MobileTopBar';
 import { MobileBottomBar } from '@/components/MobileBottomBar';
-import { useConnection } from '@/hooks';
-import { useChatStore } from '@/store';
+import { CallOverlay } from '@/components/CallOverlay';
+import { useConnection } from '@/hooks/useConnection';
+import { useChatStore } from '@/store/chatStore';
 import { useEffect } from 'react';
 
-export function RootComponent() {
+function RootComponent() {
   const { isConnected } = useConnection();
   const account = useChatStore((s) => s.account);
   const initialized = useChatStore((s) => s.initialized);
@@ -18,15 +19,12 @@ export function RootComponent() {
   useEffect(() => {
     if (!initialized) return;
     if (!account) {
-      navigate({ to: '/register' });
+      navigate({ to: '/register', search: { redirect: window.location.pathname } });
     }
   }, [account, initialized, navigate]);
 
-  if (!initialized) {
-    return null;
-  }
+  if (!initialized) return null;
 
-  // Register page — no chrome
   if (!account) {
     return <Outlet />;
   }
@@ -39,17 +37,23 @@ export function RootComponent() {
           <Outlet />
         </Box>
         <MobileBottomBar isConnected={isConnected} />
+        <CallOverlay />
       </Box>
     );
   }
 
-  // Desktop: NavRail | content
   return (
     <Box sx={{ display: 'flex', height: '100dvh' }}>
       <NavRail isConnected={isConnected} />
       <Box sx={{ flex: 1, overflow: 'hidden' }}>
         <Outlet />
       </Box>
+      <CallOverlay />
     </Box>
   );
 }
+
+export const Route = createRootRoute({
+  component: RootComponent,
+});
+

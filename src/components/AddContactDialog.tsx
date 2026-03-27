@@ -8,10 +8,10 @@ import {
   Button,
   Typography,
 } from '@mui/material';
-import { useChatStore } from '@/store';
-import { useNotification } from '@/hooks';
-import { ContactSchema } from '@/schemas';
-import { connectionManager } from '@/connection';
+import { useChatStore } from '@/store/chatStore';
+import { useNotification } from '@/hooks/notificationContext';
+import { ContactSchema } from '@/schemas/contact';
+import { connectionManager } from '@/connection/ConnectionManager';
 
 interface AddContactDialogProps {
   open: boolean;

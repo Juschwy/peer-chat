@@ -1,1 +1,0 @@
-export { connectionManager } from './ConnectionManager';

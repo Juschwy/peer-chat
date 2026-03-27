@@ -6,7 +6,8 @@ import {
   Typography,
 } from '@mui/material';
 import { OnlineAvatar } from './OnlineAvatar';
-import type { Contact, Message } from '@/schemas';
+import type { Contact } from '@/schemas/contact';
+import type { Message } from '@/schemas/message';
 import { useMemo } from 'react';
 
 interface ContactListItemProps {
@@ -30,8 +31,16 @@ export function ContactListItem({
 
   const preview = useMemo(() => {
     if (!lastMessage) return 'No messages yet';
-    const text = lastMessage.textContent;
-    return text.length > 35 ? text.slice(0, 35) + '…' : text;
+    if (lastMessage.textContent) {
+      const text = lastMessage.textContent;
+      return text.length > 35 ? text.slice(0, 35) + '…' : text;
+    }
+    if (lastMessage.attachments?.length) {
+      const count = lastMessage.attachments.length;
+      const hasImage = lastMessage.attachments.some((a) => a.mimeType.startsWith('image/'));
+      return hasImage ? `📷 ${count > 1 ? `${count} files` : 'Photo'}` : `📎 ${count > 1 ? `${count} files` : 'File'}`;
+    }
+    return 'No messages yet';
   }, [lastMessage]);
 
   const time = useMemo(() => {
