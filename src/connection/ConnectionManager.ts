@@ -1,16 +1,16 @@
-import Peer, { type DataConnection, type MediaConnection } from 'peerjs';
+import Peer, {type DataConnection, type MediaConnection} from 'peerjs';
 import {
-  PeerMessageSchema,
-  type PeerMessage,
-  type PingContent,
-  type CallOfferContent,
   type CallAnswerContent,
+  type CallOfferContent,
+  type PeerMessage,
+  PeerMessageSchema,
+  type PingContent,
 } from '@/schemas/peerMessage';
-import { MessageSchema, type Message, type FileAttachment } from '@/schemas/message';
-import type { CallType } from '@/schemas/callRecord';
-import { useChatStore } from '@/store/chatStore';
-import { v4 as uuidv4 } from 'uuid';
-import { getIsLeader } from '@/hooks/useTabLeader';
+import {type FileAttachment, type Message, MessageSchema} from '@/schemas/message';
+import type {CallType} from '@/schemas/callRecord';
+import {useChatStore} from '@/store/chatStore';
+import {v4 as uuidv4} from 'uuid';
+import {getIsLeader} from '@/hooks/useTabLeader';
 
 type NotifyFn = (message: string, severity?: 'error' | 'warning' | 'info' | 'success') => void;
 
@@ -94,12 +94,18 @@ class ConnectionManager {
 
       this.peer.on('error', (err) => {
         console.error('[PeerChat] Peer error:', err);
-        this.notifyFn(
-          err.type === 'unavailable-id'
-            ? 'Peer ID already in use. Try refreshing.'
-            : `Connection error: ${err.message || err.type}`,
-          'error',
-        );
+
+        // Only notify for errors that are NOT "peer offline / unreachable"
+        const silentTypes = new Set(['peer-unavailable', 'network', 'disconnected', 'socket-error', 'socket-closed']);
+        if (!silentTypes.has(err.type)) {
+          this.notifyFn(
+              err.type === 'unavailable-id'
+                  ? 'Peer ID already in use. Try refreshing.'
+                  : `Connection error: ${err.message || err.type}`,
+              'error',
+          );
+        }
+
         this._isConnected = false;
         this.emit();
         reject(err);
@@ -117,7 +123,8 @@ class ConnectionManager {
     conn.on('open', () => this.registerConnection(conn));
     conn.on('error', (err) => {
       console.error('[PeerChat] Connection error:', err);
-      this.notifyFn(`Connection error with ${conn.peer.substring(0, 8)}…`, 'error');
+      // Don't notify — this typically means the peer went offline
+      this.handleConnectionLost(conn.peer);
     });
   }
 
@@ -299,7 +306,7 @@ class ConnectionManager {
     this.resendUndeliveredMessages(fromPeerId);
   }
 
-  private ensureContact(peerId: string, name: string, avatar?: string) {
+  private ensureContact(peerId: string, name: string, avatar?: string | null) {
     const store = useChatStore.getState();
     const existing = store.contacts.find((c) => c.id === peerId);
     if (!existing) {
@@ -307,7 +314,7 @@ class ConnectionManager {
     } else {
       const updates: Record<string, string> = {};
       if (existing.name !== name) updates.name = name;
-      if (avatar !== undefined && existing.avatar !== avatar) updates.avatar = avatar;
+      if (avatar && existing.avatar !== avatar) updates.avatar = avatar;
       if (Object.keys(updates).length > 0) store.updateContact(peerId, updates);
     }
   }

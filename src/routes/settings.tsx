@@ -1,15 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Switch,
-  Divider,
-} from '@mui/material';
+import {createFileRoute} from '@tanstack/react-router';
+import {Box, Card, CardContent, Divider, Switch, Typography,} from '@mui/material';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import InfoIcon from '@mui/icons-material/Info';
-import { useThemeStore } from '@/store/themeStore';
+import {useThemeStore} from '@/store/themeStore';
 
 function SettingsPage() {
   const themeMode = useThemeStore((s) => s.mode);
@@ -83,7 +76,7 @@ function SettingsPage() {
               </Box>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-              0.1.0
+                {import.meta.env.PACKAGE_VERSION}
             </Typography>
           </Box>
         </CardContent>

@@ -1,6 +1,6 @@
-import { z } from 'zod';
-import { MessageSchema } from '@/schemas/message';
-import { CallType } from '@/schemas/callRecord';
+import {z} from 'zod';
+import {MessageSchema} from '@/schemas/message';
+import {CallType} from '@/schemas/callRecord';
 
 export const PeerMessageType = z.enum([
   'PING_SEND',
@@ -20,7 +20,7 @@ export type PeerMessageType = z.infer<typeof PeerMessageType>;
 export const PingContentSchema = z.object({
   peerId: z.string().min(1),
   name: z.string().min(1),
-  avatar: z.string().optional(),
+  avatar: z.string().nullable().optional(),
 });
 
 export type PingContent = z.infer<typeof PingContentSchema>;
