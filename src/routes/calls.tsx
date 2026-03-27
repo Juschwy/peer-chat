@@ -25,7 +25,12 @@ function formatCallTime(date: Date | string) {
   if (d.toDateString() === now.toDateString()) {
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function formatDuration(start: Date | string, end?: Date | string) {
@@ -50,7 +55,10 @@ function CallsPage() {
   const contacts = useChatStore((s) => s.contacts);
 
   const sortedRecords = useMemo(
-    () => [...callRecords].sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()),
+      () =>
+          [...callRecords].sort(
+              (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+          ),
     [callRecords],
   );
 
@@ -90,7 +98,10 @@ function CallsPage() {
                     primary={
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <CallStatusIcon record={record} />
-                        <Typography variant="body1" fontWeight={record.status === 'missed' ? 600 : 400}>
+                        <Typography
+                            variant="body1"
+                            fontWeight={record.status === 'missed' ? 600 : 400}
+                        >
                           {name}
                         </Typography>
                       </Box>
@@ -127,4 +138,3 @@ function CallsPage() {
 export const Route = createFileRoute('/calls')({
   component: CallsPage,
 });
-

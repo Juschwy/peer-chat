@@ -13,7 +13,15 @@ export function MobileBottomBar({ isConnected }: MobileBottomBarProps) {
   const account = useChatStore((s) => s.account);
   const navigate = useNavigate();
 
-  const NavItem = ({ icon, label, onTap }: { icon: React.ReactNode; label: string; onTap: () => void }) => (
+    const NavItem = ({
+                         icon,
+                         label,
+                         onTap,
+                     }: {
+        icon: React.ReactNode;
+        label: string;
+        onTap: () => void;
+    }) => (
     <IconButton onClick={onTap} sx={{ p: 0.5 }}>
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {icon}
@@ -39,12 +47,21 @@ export function MobileBottomBar({ isConnected }: MobileBottomBarProps) {
         pb: 'max(8px, env(safe-area-inset-bottom))',
       }}
     >
-      <NavItem icon={<ChatBubbleIcon color="primary" />} label="Chats" onTap={() => navigate({ to: '/chats' })} />
+        <NavItem
+            icon={<ChatBubbleIcon color="primary"/>}
+            label="Chats"
+            onTap={() => navigate({to: '/chats'})}
+        />
       <NavItem icon={<PhoneIcon />} label="Calls" onTap={() => navigate({ to: '/calls' })} />
       <IconButton onClick={() => navigate({ to: '/profile' })} sx={{ p: 0.25 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           {account ? (
-            <OnlineAvatar name={account.name} avatar={account.avatar} online={isConnected} size={28} />
+              <OnlineAvatar
+                  name={account.name}
+                  avatar={account.avatar}
+                  online={isConnected}
+                  size={28}
+              />
           ) : (
             <ChatBubbleIcon />
           )}

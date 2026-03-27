@@ -4,4 +4,3 @@ import { EmptyChatArea } from '@/components/EmptyChatArea';
 export const Route = createFileRoute('/chats/')({
   component: EmptyChatArea,
 });
-

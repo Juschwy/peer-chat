@@ -42,7 +42,9 @@ class ConnectionManager {
 
   subscribe(fn: () => void) {
     this.listeners.add(fn);
-    return () => { this.listeners.delete(fn); };
+    return () => {
+      this.listeners.delete(fn);
+    };
   }
 
   private emit() {
@@ -96,7 +98,13 @@ class ConnectionManager {
         console.error('[PeerChat] Peer error:', err);
 
         // Only notify for errors that are NOT "peer offline / unreachable"
-        const silentTypes = new Set(['peer-unavailable', 'network', 'disconnected', 'socket-error', 'socket-closed']);
+        const silentTypes = new Set([
+          'peer-unavailable',
+          'network',
+          'disconnected',
+          'socket-error',
+          'socket-closed',
+        ]);
         if (!silentTypes.has(err.type)) {
           this.notifyFn(
               err.type === 'unavailable-id'
@@ -162,9 +170,17 @@ class ConnectionManager {
       if (existing?.open) return resolve(existing);
 
       const conn = this.peer.connect(peerId, { reliable: true });
-      conn.on('open', () => { this.registerConnection(conn); resolve(conn); });
+      conn.on('open', () => {
+        this.registerConnection(conn);
+        resolve(conn);
+      });
       conn.on('error', reject);
-      setTimeout(() => { if (!conn.open) { conn.close(); reject(new Error('Connection timeout')); } }, 10000);
+      setTimeout(() => {
+        if (!conn.open) {
+          conn.close();
+          reject(new Error('Connection timeout'));
+        }
+      }, 10000);
     });
   }
 
@@ -177,7 +193,10 @@ class ConnectionManager {
   private connectAndPing(peerId: string) {
     this.connectToPeer(peerId)
       .then(() => this.sendPing(peerId))
-      .catch(() => { useChatStore.getState().setPeerOffline(peerId); this.emit(); });
+        .catch(() => {
+          useChatStore.getState().setPeerOffline(peerId);
+          this.emit();
+        });
   }
 
   private sendPing(peerId: string) {
@@ -209,7 +228,10 @@ class ConnectionManager {
 
   private stopPing(peerId: string) {
     const interval = this.pingIntervals.get(peerId);
-    if (interval) { clearInterval(interval); this.pingIntervals.delete(peerId); }
+    if (interval) {
+      clearInterval(interval);
+      this.pingIntervals.delete(peerId);
+    }
     this.clearPingTimeout(peerId);
   }
 
@@ -219,7 +241,10 @@ class ConnectionManager {
       useChatStore.getState().setPeerOffline(peerId);
       this.emit();
       const conn = this.connections.get(peerId);
-      if (conn) { conn.close(); this.connections.delete(peerId); }
+      if (conn) {
+        conn.close();
+        this.connections.delete(peerId);
+      }
       this.stopPing(peerId);
     }, 10000);
     this.pingTimeouts.set(peerId, timeout);
@@ -227,7 +252,10 @@ class ConnectionManager {
 
   private clearPingTimeout(peerId: string) {
     const timeout = this.pingTimeouts.get(peerId);
-    if (timeout) { clearTimeout(timeout); this.pingTimeouts.delete(peerId); }
+    if (timeout) {
+      clearTimeout(timeout);
+      this.pingTimeouts.delete(peerId);
+    }
   }
 
   private attemptReconnect() {
@@ -246,7 +274,10 @@ class ConnectionManager {
     if (!result.success) {
       console.error('[PeerChat] Invalid envelope from', fromPeerId, result.error.issues);
       this.notifyFn('Received invalid message format', 'error');
-      this.sendDirect(fromPeerId, { type: 'MESSAGE_RETURN_INVALID', content: { reason: 'Invalid format' } });
+      this.sendDirect(fromPeerId, {
+        type: 'MESSAGE_RETURN_INVALID',
+        content: {reason: 'Invalid format'},
+      });
       return;
     }
 
@@ -264,7 +295,9 @@ class ConnectionManager {
         break;
       case 'MESSAGE_RETURN_RECEIVED': {
         const c = content as { messageId: string; receivedTimestamp: string };
-        this.updateMessageTimestamp(c.messageId, { receivedTimestamp: new Date(c.receivedTimestamp) });
+        this.updateMessageTimestamp(c.messageId, {
+          receivedTimestamp: new Date(c.receivedTimestamp),
+        });
         break;
       }
       case 'MESSAGE_RETURN_READ': {
@@ -327,7 +360,12 @@ class ConnectionManager {
     // Ensure we have a contact
     const store = useChatStore.getState();
     if (!store.contacts.find((c) => c.id === fromPeerId)) {
-      store.addContact({ id: fromPeerId, name: fromPeerId.substring(0, 8), avatar: '', publicKey: fromPeerId });
+      store.addContact({
+        id: fromPeerId,
+        name: fromPeerId.substring(0, 8),
+        avatar: '',
+        publicKey: fromPeerId,
+      });
       this.sendPing(fromPeerId);
     }
 
@@ -351,9 +389,16 @@ class ConnectionManager {
   }
 
   // ─── Send Message ──────────────────────────────────────────
-  sendMessage(receiverId: string, textContent: string, attachments?: FileAttachment[]): Message | null {
+  sendMessage(
+      receiverId: string,
+      textContent: string,
+      attachments?: FileAttachment[],
+  ): Message | null {
     const { account } = useChatStore.getState();
-    if (!account) { this.notifyFn('No account found', 'error'); return null; }
+    if (!account) {
+      this.notifyFn('No account found', 'error');
+      return null;
+    }
 
     const message: Message = {
       id: uuidv4(),
@@ -371,7 +416,10 @@ class ConnectionManager {
     }
 
     useChatStore.getState().addMessage(result.data);
-    this.sendToPeer(receiverId, { type: 'MESSAGE_SEND', content: JSON.parse(JSON.stringify(result.data)) });
+    this.sendToPeer(receiverId, {
+      type: 'MESSAGE_SEND',
+      content: JSON.parse(JSON.stringify(result.data)),
+    });
     return result.data;
   }
 
@@ -388,14 +436,20 @@ class ConnectionManager {
     const now = new Date();
     for (const msg of unread) {
       useChatStore.getState().updateMessage(msg.id, { readTimestamp: now });
-      const ack: PeerMessage = { type: 'MESSAGE_RETURN_READ', content: { messageId: msg.id, readTimestamp: now.toISOString() } };
+      const ack: PeerMessage = {
+        type: 'MESSAGE_RETURN_READ',
+        content: {messageId: msg.id, readTimestamp: now.toISOString()},
+      };
       this.sendDirect(contactId, ack) || this.sendToPeer(contactId, ack);
     }
   }
 
   // ─── Call Management ───────────────────────────────────────
   async startCall(peerId: string, callType: CallType): Promise<void> {
-    if (!this.peer) { this.notifyFn('Not connected', 'error'); return; }
+    if (!this.peer) {
+      this.notifyFn('Not connected', 'error');
+      return;
+    }
     const { account } = useChatStore.getState();
     if (!account) return;
 
@@ -440,7 +494,10 @@ class ConnectionManager {
       });
 
       mediaConn.on('close', () => this.cleanupCall(callId));
-      mediaConn.on('error', () => { this.notifyFn('Call error', 'error'); this.cleanupCall(callId); });
+      mediaConn.on('error', () => {
+        this.notifyFn('Call error', 'error');
+        this.cleanupCall(callId);
+      });
     } catch (err) {
       this.notifyFn('Could not access microphone/camera', 'error');
       console.error('[PeerChat] getUserMedia error:', err);
@@ -496,7 +553,9 @@ class ConnectionManager {
       });
 
       this.activeMediaConnection.answer(stream);
-      useChatStore.getState().setActiveCall({ ...active, status: 'connected', localStream: stream });
+      useChatStore
+          .getState()
+          .setActiveCall({...active, status: 'connected', localStream: stream});
       useChatStore.getState().updateCallRecord(active.callId, { status: 'answered' });
       this.sendToPeer(active.peerId, { type: 'CALL_ANSWER', content: { callId: active.callId } });
 
@@ -515,7 +574,9 @@ class ConnectionManager {
   rejectCall() {
     const active = useChatStore.getState().activeCall;
     if (!active) return;
-    useChatStore.getState().updateCallRecord(active.callId, { status: 'rejected', endedAt: new Date() });
+    useChatStore
+        .getState()
+        .updateCallRecord(active.callId, {status: 'rejected', endedAt: new Date()});
     this.sendToPeer(active.peerId, { type: 'CALL_REJECT', content: { callId: active.callId } });
     this.cleanupCall(active.callId);
   }
@@ -539,7 +600,9 @@ class ConnectionManager {
   private handleCallReject(fromPeerId: string) {
     const active = useChatStore.getState().activeCall;
     if (active?.peerId === fromPeerId) {
-      useChatStore.getState().updateCallRecord(active.callId, { status: 'rejected', endedAt: new Date() });
+      useChatStore
+          .getState()
+          .updateCallRecord(active.callId, {status: 'rejected', endedAt: new Date()});
       this.cleanupCall(active.callId);
       this.notifyFn('Call was rejected', 'info');
     }
@@ -568,8 +631,14 @@ class ConnectionManager {
   sendToPeer(peerId: string, message: PeerMessage) {
     if (!this.sendDirect(peerId, message)) {
       this.connectToPeer(peerId)
-        .then((conn) => { logDebug('SEND', peerId, message); conn.send(message); })
-        .catch(() => { useChatStore.getState().setPeerOffline(peerId); this.emit(); });
+          .then((conn) => {
+            logDebug('SEND', peerId, message);
+            conn.send(message);
+          })
+          .catch(() => {
+            useChatStore.getState().setPeerOffline(peerId);
+            this.emit();
+          });
     }
   }
 
@@ -594,7 +663,10 @@ class ConnectionManager {
   }
 
   destroy() {
-    if (this.reconnectTimeout) { clearTimeout(this.reconnectTimeout); this.reconnectTimeout = null; }
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     this.pingIntervals.forEach((i) => clearInterval(i));
     this.pingIntervals.clear();
     this.pingTimeouts.forEach((t) => clearTimeout(t));
@@ -602,7 +674,10 @@ class ConnectionManager {
     this.connections.forEach((c) => c.close());
     this.connections.clear();
     this.cleanupCall('');
-    if (this.peer) { this.peer.destroy(); this.peer = null; }
+    if (this.peer) {
+      this.peer.destroy();
+      this.peer = null;
+    }
     this._isConnected = false;
     this.emit();
   }

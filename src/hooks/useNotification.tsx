@@ -8,7 +8,6 @@ interface Notification {
   severity: AlertColor;
 }
 
-
 let notificationId = 0;
 
 export function NotificationProvider({ children }: { children: ReactNode }) {

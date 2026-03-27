@@ -1,5 +1,5 @@
 import {createFileRoute} from '@tanstack/react-router';
-import {Box, Card, CardContent, Divider, Switch, Typography,} from '@mui/material';
+import {Box, Card, CardContent, Divider, Switch, Typography} from '@mui/material';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import InfoIcon from '@mui/icons-material/Info';
 import {useThemeStore} from '@/store/themeStore';
@@ -45,11 +45,7 @@ function SettingsPage() {
                 </Typography>
               </Box>
             </Box>
-            <Switch
-              checked={themeMode === 'dark'}
-              onChange={toggleTheme}
-              size="small"
-            />
+              <Switch checked={themeMode === 'dark'} onChange={toggleTheme} size="small"/>
           </Box>
 
           <Divider />
@@ -88,4 +84,3 @@ function SettingsPage() {
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
 });
-

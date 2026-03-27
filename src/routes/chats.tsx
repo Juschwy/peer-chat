@@ -35,4 +35,3 @@ function ChatsLayout() {
 export const Route = createFileRoute('/chats')({
   component: ChatsLayout,
 });
-

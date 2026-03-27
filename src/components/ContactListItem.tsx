@@ -1,10 +1,4 @@
-import {
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  ListItemButton,
-  Typography,
-} from '@mui/material';
+import {ListItem, ListItemAvatar, ListItemText, ListItemButton, Typography} from '@mui/material';
 import { OnlineAvatar } from './OnlineAvatar';
 import type { Contact } from '@/schemas/contact';
 import type { Message } from '@/schemas/message';
@@ -38,7 +32,9 @@ export function ContactListItem({
     if (lastMessage.attachments?.length) {
       const count = lastMessage.attachments.length;
       const hasImage = lastMessage.attachments.some((a) => a.mimeType.startsWith('image/'));
-      return hasImage ? `📷 ${count > 1 ? `${count} files` : 'Photo'}` : `📎 ${count > 1 ? `${count} files` : 'File'}`;
+      return hasImage
+          ? `📷 ${count > 1 ? `${count} files` : 'Photo'}`
+          : `📎 ${count > 1 ? `${count} files` : 'File'}`;
     }
     return 'No messages yet';
   }, [lastMessage]);
@@ -61,11 +57,7 @@ export function ContactListItem({
         </ListItemAvatar>
         <ListItemText
           primary={
-            <Typography
-              variant="body1"
-              fontWeight={unreadCount > 0 ? 700 : 400}
-              noWrap
-            >
+            <Typography variant="body1" fontWeight={unreadCount > 0 ? 700 : 400} noWrap>
               {displayName}
             </Typography>
           }
@@ -82,7 +74,13 @@ export function ContactListItem({
                   {contact.name}
                 </Typography>
               )}
-              <Typography variant="body2" color="text.secondary" noWrap component="span" sx={{ display: 'block' }}>
+              <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  noWrap
+                  component="span"
+                  sx={{display: 'block'}}
+              >
                 {preview}
               </Typography>
             </>

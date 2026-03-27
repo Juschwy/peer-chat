@@ -56,7 +56,12 @@ export function NavRail({ isConnected }: NavRailProps) {
         {account && (
           <Tooltip title="Profile" placement="right">
             <IconButton onClick={() => navigate({ to: '/profile' })} sx={{ p: 0.25 }}>
-              <OnlineAvatar name={account.name} avatar={account.avatar} online={isConnected} size={32} />
+                <OnlineAvatar
+                    name={account.name}
+                    avatar={account.avatar}
+                    online={isConnected}
+                    size={32}
+                />
             </IconButton>
           </Tooltip>
         )}

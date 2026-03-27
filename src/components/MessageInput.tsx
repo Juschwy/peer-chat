@@ -6,6 +6,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import { v4 as uuidv4 } from 'uuid';
 import type { FileAttachment } from '@/schemas/message';
+import {formatFileSize} from '@/utils/format';
 
 interface MessageInputProps {
   onSend: (text: string, attachments?: FileAttachment[]) => void;
@@ -68,11 +69,6 @@ export function MessageInput({ onSend, disabled = false }: MessageInputProps) {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
 
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
@@ -95,7 +91,7 @@ export function MessageInput({ onSend, disabled = false }: MessageInputProps) {
               }
               label={
                 <Typography variant="caption" noWrap sx={{ maxWidth: 120 }}>
-                  {att.name} ({formatSize(att.size)})
+                  {att.name} ({formatFileSize(att.size)})
                 </Typography>
               }
               onDelete={() => removeAttachment(att.id)}
@@ -129,7 +125,12 @@ export function MessageInput({ onSend, disabled = false }: MessageInputProps) {
           multiline
           maxRows={4}
         />
-        <IconButton color="primary" onClick={handleSend} disabled={disabled || !hasContent} sx={{ mb: 0.25 }}>
+        <IconButton
+            color="primary"
+            onClick={handleSend}
+            disabled={disabled || !hasContent}
+            sx={{mb: 0.25}}
+        >
           <SendIcon />
         </IconButton>
       </Box>

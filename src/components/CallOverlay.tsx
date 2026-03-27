@@ -1,11 +1,20 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {Avatar, Box, Dialog, DialogContent, IconButton, Typography,} from '@mui/material';
+import {Avatar, Box, Dialog, DialogContent, IconButton, Typography} from '@mui/material';
 import CallEndIcon from '@mui/icons-material/CallEnd';
 import CallIcon from '@mui/icons-material/Call';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import {useChatStore} from '@/store/chatStore';
 import {connectionManager} from '@/connection/ConnectionManager';
 import {getInitials, stringToColor} from '@/utils/avatar';
+
+const callButtonSx = (color: 'success' | 'error') =>
+    ({
+        bgcolor: `${color}.main`,
+        color: '#fff',
+        '&:hover': {bgcolor: `${color}.dark`},
+        width: 56,
+        height: 56,
+    }) as const;
 
 export function CallOverlay() {
   const activeCall = useChatStore((s) => s.activeCall);
@@ -19,11 +28,15 @@ export function CallOverlay() {
     () => contacts.find((c) => c.id === activeCall?.peerId),
     [contacts, activeCall?.peerId],
   );
-  const displayName = contact?.nickname || contact?.name || activeCall?.peerId?.substring(0, 8) || '';
+    const displayName =
+        contact?.nickname || contact?.name || activeCall?.peerId?.substring(0, 8) || '';
 
   // Timer for connected calls
   useEffect(() => {
-    if (activeCall?.status !== 'connected') { setElapsed(0); return; }
+      if (activeCall?.status !== 'connected') {
+          setElapsed(0);
+          return;
+      }
     const start = Date.now();
     const timer = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
     return () => clearInterval(timer);
@@ -130,8 +143,20 @@ export function CallOverlay() {
 
         {/* Connected audio — show timer overlay */}
         {!isRinging && isVideo && (
-          <Box sx={{ position: 'absolute', top: 16, left: 0, right: 0, textAlign: 'center', zIndex: 3 }}>
-            <Typography variant="body2" sx={{ color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+            <Box
+                sx={{
+                    position: 'absolute',
+                    top: 16,
+                    left: 0,
+                    right: 0,
+                    textAlign: 'center',
+                    zIndex: 3,
+                }}
+            >
+                <Typography
+                    variant="body2"
+                    sx={{color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.5)'}}
+                >
               {displayName} · {formatTime(elapsed)}
             </Typography>
           </Box>
@@ -147,42 +172,23 @@ export function CallOverlay() {
           }}
         >
           {isRinging && isInbound && (
-            <>
-              <IconButton
-                onClick={() => connectionManager.answerCall()}
-                sx={{ bgcolor: 'success.main', color: '#fff', '&:hover': { bgcolor: 'success.dark' }, width: 56, height: 56 }}
-              >
-                {isVideo ? <VideocamIcon /> : <CallIcon />}
-              </IconButton>
-              <IconButton
-                onClick={() => connectionManager.rejectCall()}
-                sx={{ bgcolor: 'error.main', color: '#fff', '&:hover': { bgcolor: 'error.dark' }, width: 56, height: 56 }}
-              >
-                <CallEndIcon />
-              </IconButton>
-            </>
-          )}
-
-          {isRinging && !isInbound && (
-            <IconButton
-              onClick={() => connectionManager.endCall()}
-              sx={{ bgcolor: 'error.main', color: '#fff', '&:hover': { bgcolor: 'error.dark' }, width: 56, height: 56 }}
-            >
-              <CallEndIcon />
+              <IconButton onClick={() => connectionManager.answerCall()} sx={callButtonSx('success')}>
+                  {isVideo ? <VideocamIcon/> : <CallIcon/>}
             </IconButton>
           )}
 
-          {!isRinging && (
             <IconButton
-              onClick={() => connectionManager.endCall()}
-              sx={{ bgcolor: 'error.main', color: '#fff', '&:hover': { bgcolor: 'error.dark' }, width: 56, height: 56 }}
+                onClick={() =>
+                    isRinging && isInbound
+                        ? connectionManager.rejectCall()
+                        : connectionManager.endCall()
+                }
+                sx={callButtonSx('error')}
             >
-              <CallEndIcon />
+                <CallEndIcon/>
             </IconButton>
-          )}
         </Box>
       </DialogContent>
     </Dialog>
   );
 }
-

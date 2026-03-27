@@ -57,7 +57,9 @@ export function ShareDialog({ open, onClose }: ShareDialogProps) {
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>Share your Profile</DialogTitle>
       <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2.5, py: 2 }}>
+        <Box
+            sx={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2.5, py: 2}}
+        >
           <Typography variant="body2" color="text.secondary" textAlign="center">
             Scan this QR code or share the link so others can connect with you.
           </Typography>
@@ -71,17 +73,17 @@ export function ShareDialog({ open, onClose }: ShareDialogProps) {
               display: 'inline-flex',
             }}
           >
-            <QRCodeSVG
-              value={connectUrl}
-              size={200}
-              level="M"
-              includeMargin={false}
-            />
+            <QRCodeSVG value={connectUrl} size={200} level="M" includeMargin={false}/>
           </Box>
 
           {/* Connect link */}
           <Box sx={{ width: '100%' }}>
-            <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+            <Typography
+                variant="caption"
+                color="text.secondary"
+                gutterBottom
+                sx={{display: 'block'}}
+            >
               Connect Link
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -106,7 +108,12 @@ export function ShareDialog({ open, onClose }: ShareDialogProps) {
 
           {/* Peer ID */}
           <Box sx={{ width: '100%' }}>
-            <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+            <Typography
+                variant="caption"
+                color="text.secondary"
+                gutterBottom
+                sx={{display: 'block'}}
+            >
               Peer ID
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

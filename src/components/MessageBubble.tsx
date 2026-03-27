@@ -1,8 +1,19 @@
-import { Box, Typography, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
+import {
+    Box,
+    Typography,
+    Menu,
+    MenuItem,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+} from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import DownloadIcon from '@mui/icons-material/Download';
 import type { Message, FileAttachment } from '@/schemas/message';
+import {formatFileSize} from '@/utils/format';
 import { useMemo, useState, type MouseEvent } from 'react';
 
 interface MessageBubbleProps {
@@ -14,16 +25,15 @@ function formatTs(d: Date | string | undefined): string {
   if (!d) return '—';
   const date = new Date(d);
   return date.toLocaleString([], {
-    year: 'numeric', month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
   });
 }
 
-function formatSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function ImageAttachment({ attachment }: { attachment: FileAttachment }) {
   return (
@@ -73,7 +83,7 @@ function FileAttachmentChip({ attachment, isOwn }: { attachment: FileAttachment;
           {attachment.name}
         </Typography>
         <Typography variant="caption" sx={{ opacity: 0.7, fontSize: '0.65rem' }}>
-          {formatSize(attachment.size)}
+            {formatFileSize(attachment.size)}
         </Typography>
       </Box>
       <DownloadIcon sx={{ fontSize: 16, opacity: 0.7 }} />
@@ -107,7 +117,9 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
 
   return (
     <>
-      <Box sx={{ display: 'flex', justifyContent: isOwn ? 'flex-end' : 'flex-start', mb: 0.5, px: 2 }}>
+        <Box
+            sx={{display: 'flex', justifyContent: isOwn ? 'flex-end' : 'flex-start', mb: 0.5, px: 2}}
+        >
         <Box
           onContextMenu={handleContextMenu}
           sx={{
@@ -121,15 +133,21 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
           }}
         >
           {/* Attachments */}
-          {hasAttachments && message.attachments!.map((att) =>
-            att.mimeType.startsWith('image/')
-              ? <ImageAttachment key={att.id} attachment={att} />
-              : <FileAttachmentChip key={att.id} attachment={att} isOwn={isOwn} />,
-          )}
+            {hasAttachments &&
+                message.attachments!.map((att) =>
+                    att.mimeType.startsWith('image/') ? (
+                        <ImageAttachment key={att.id} attachment={att}/>
+                    ) : (
+                        <FileAttachmentChip key={att.id} attachment={att} isOwn={isOwn}/>
+                    ),
+                )}
 
           {/* Text */}
           {hasText && (
-            <Typography variant="body2" sx={{ wordBreak: 'break-word', mt: hasAttachments ? 0.5 : 0 }}>
+              <Typography
+                  variant="body2"
+                  sx={{wordBreak: 'break-word', mt: hasAttachments ? 0.5 : 0}}
+              >
               {message.textContent}
             </Typography>
           )}
@@ -155,7 +173,13 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
         anchorReference="anchorPosition"
         anchorPosition={contextMenu ? { top: contextMenu.y, left: contextMenu.x } : undefined}
       >
-        <MenuItem onClick={() => { setContextMenu(null); setInfoOpen(true); }} sx={{ gap: 1, fontSize: '0.875rem' }}>
+          <MenuItem
+              onClick={() => {
+                  setContextMenu(null);
+                  setInfoOpen(true);
+              }}
+              sx={{gap: 1, fontSize: '0.875rem'}}
+          >
           <InfoIcon fontSize="small" /> Info
         </MenuItem>
       </Menu>
@@ -167,38 +191,54 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
             {hasText && (
               <Box>
-                <Typography variant="caption" color="text.secondary">Message</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                      Message
+                  </Typography>
                 <Typography variant="body2">{message.textContent}</Typography>
               </Box>
             )}
             {hasAttachments && (
               <Box>
-                <Typography variant="caption" color="text.secondary">Attachments</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                      Attachments
+                  </Typography>
                 {message.attachments!.map((att) => (
                   <Typography key={att.id} variant="body2" sx={{ fontSize: '0.8rem' }}>
-                    {att.name} ({formatSize(att.size)})
+                      {att.name} ({formatFileSize(att.size)})
                   </Typography>
                 ))}
               </Box>
             )}
             <Box>
-              <Typography variant="caption" color="text.secondary">Message ID</Typography>
-              <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{message.id}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                    Message ID
+                </Typography>
+                <Typography variant="body2" sx={{fontFamily: 'monospace', fontSize: '0.75rem'}}>
+                    {message.id}
+                </Typography>
             </Box>
             <Box>
-              <Typography variant="caption" color="text.secondary">Sent</Typography>
+                <Typography variant="caption" color="text.secondary">
+                    Sent
+                </Typography>
               <Typography variant="body2">{formatTs(message.sentTimestamp)}</Typography>
             </Box>
             <Box>
-              <Typography variant="caption" color="text.secondary">Received</Typography>
+                <Typography variant="caption" color="text.secondary">
+                    Received
+                </Typography>
               <Typography variant="body2">{formatTs(message.receivedTimestamp)}</Typography>
             </Box>
             <Box>
-              <Typography variant="caption" color="text.secondary">Read</Typography>
+                <Typography variant="caption" color="text.secondary">
+                    Read
+                </Typography>
               <Typography variant="body2">{formatTs(message.readTimestamp)}</Typography>
             </Box>
             <Box>
-              <Typography variant="caption" color="text.secondary">From → To</Typography>
+                <Typography variant="caption" color="text.secondary">
+                    From → To
+                </Typography>
               <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
                 {message.senderId.substring(0, 8)}… → {message.receiverId.substring(0, 8)}…
               </Typography>

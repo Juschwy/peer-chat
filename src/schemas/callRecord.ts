@@ -17,4 +17,3 @@ export const CallRecordSchema = z.object({
 });
 
 export type CallRecord = z.infer<typeof CallRecordSchema>;
-

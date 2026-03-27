@@ -100,7 +100,12 @@ export function ContactInfoDialog({ open, onClose, contact, online }: ContactInf
 
         {/* Nickname edit */}
         <Box sx={{ py: 1 }}>
-          <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+            <Typography
+                variant="caption"
+                color="text.secondary"
+                gutterBottom
+                sx={{display: 'block'}}
+            >
             Nickname
           </Typography>
           {editingNickname ? (
@@ -126,9 +131,7 @@ export function ContactInfoDialog({ open, onClose, contact, online }: ContactInf
             </Box>
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2">
-                {contact.nickname || '—'}
-              </Typography>
+                <Typography variant="body2">{contact.nickname || '—'}</Typography>
               <IconButton size="small" onClick={() => setEditingNickname(true)}>
                 <EditIcon fontSize="small" />
               </IconButton>
@@ -138,7 +141,12 @@ export function ContactInfoDialog({ open, onClose, contact, online }: ContactInf
 
         {/* Username (remote name) */}
         <Box sx={{ py: 1 }}>
-          <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+            <Typography
+                variant="caption"
+                color="text.secondary"
+                gutterBottom
+                sx={{display: 'block'}}
+            >
             Username
           </Typography>
           <Typography variant="body2">{contact.name}</Typography>
@@ -146,7 +154,12 @@ export function ContactInfoDialog({ open, onClose, contact, online }: ContactInf
 
         {/* Peer ID */}
         <Box sx={{ py: 1 }}>
-          <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+            <Typography
+                variant="caption"
+                color="text.secondary"
+                gutterBottom
+                sx={{display: 'block'}}
+            >
             Peer ID
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

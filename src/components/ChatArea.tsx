@@ -10,6 +10,7 @@ import { MessageList } from '@/components/MessageList';
 import { MessageInput } from '@/components/MessageInput';
 import { OnlineAvatar } from '@/components/OnlineAvatar';
 import { ContactInfoDialog } from '@/components/ContactInfoDialog';
+import type {FileAttachment} from '@/schemas/message';
 
 interface ChatAreaProps {
   chatId: string;
@@ -46,7 +47,7 @@ export function ChatArea({ chatId }: ChatAreaProps) {
     connectionManager.markMessagesAsRead(chatId);
   }, [chatId, chatMessages.length, account]);
 
-  const handleSend = (text: string, attachments?: import('@/schemas/message').FileAttachment[]) => {
+    const handleSend = (text: string, attachments?: FileAttachment[]) => {
     connectionManager.sendMessage(chatId, text, attachments);
   };
 
@@ -79,7 +80,14 @@ export function ChatArea({ chatId }: ChatAreaProps) {
           </IconButton>
         )}
         <Box
-          sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, cursor: 'pointer', minWidth: 0 }}
+            sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                flex: 1,
+                cursor: 'pointer',
+                minWidth: 0,
+            }}
           onClick={() => setInfoOpen(true)}
         >
           <OnlineAvatar name={displayName} avatar={contact.avatar} online={isOnline} size={36} />
@@ -88,7 +96,12 @@ export function ChatArea({ chatId }: ChatAreaProps) {
               {displayName}
             </Typography>
             {contact.nickname && (
-              <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.7rem' }}>
+                <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    noWrap
+                    sx={{fontSize: '0.7rem'}}
+                >
                 {contact.name}
               </Typography>
             )}
@@ -104,7 +117,11 @@ export function ChatArea({ chatId }: ChatAreaProps) {
             </IconButton>
           </>
         )}
-        <Typography variant="caption" color={isOnline ? 'success.main' : 'text.disabled'} sx={{ ml: 0.5 }}>
+          <Typography
+              variant="caption"
+              color={isOnline ? 'success.main' : 'text.disabled'}
+              sx={{ml: 0.5}}
+          >
           {isOnline ? 'Online' : 'Offline'}
         </Typography>
       </Box>
@@ -115,7 +132,12 @@ export function ChatArea({ chatId }: ChatAreaProps) {
       <MessageInput onSend={handleSend} />
 
       {/* Contact info dialog */}
-      <ContactInfoDialog open={infoOpen} onClose={() => setInfoOpen(false)} contact={contact} online={isOnline} />
+        <ContactInfoDialog
+            open={infoOpen}
+            onClose={() => setInfoOpen(false)}
+            contact={contact}
+            online={isOnline}
+        />
     </Box>
   );
 }

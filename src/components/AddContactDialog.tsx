@@ -36,7 +36,7 @@ export function AddContactDialog({ open, onClose }: AddContactDialogProps) {
     try {
       const contact = ContactSchema.parse({
         id: trimmedId,
-        name: trimmedId.substring(0, 8),  // Provisional name, will be updated by ping
+          name: trimmedId.substring(0, 8), // Provisional name, will be updated by ping
         nickname: trimmedNickname || undefined,
         avatar: '',
         publicKey: trimmedId,

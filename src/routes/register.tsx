@@ -15,6 +15,7 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import { v4 as uuidv4 } from 'uuid';
 import { useChatStore } from '@/store/chatStore';
 import { useNotification } from '@/hooks/notificationContext';
+import {downscaleAvatar} from '@/utils/image';
 
 function RegisterPage() {
   const [username, setUsername] = useState('');
@@ -25,21 +26,20 @@ function RegisterPage() {
   const search = useSearch({ from: '/register' }) as { redirect?: string };
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAvatarSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleAvatarSelect = useCallback(
+      async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
 
-    if (file.size > 100_000) {
-      notify('Image too large. Please use an image under 100KB.', 'warning');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAvatarData(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  }, [notify]);
+        try {
+          const dataUrl = await downscaleAvatar(file);
+          setAvatarData(dataUrl);
+        } catch {
+          notify('Failed to process image', 'error');
+        }
+      },
+      [notify],
+  );
 
   const handleRegister = async () => {
     const trimmed = username.trim();
@@ -161,4 +161,3 @@ export const Route = createFileRoute('/register')({
     redirect: (search.redirect as string) || undefined,
   }),
 });
-

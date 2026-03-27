@@ -22,6 +22,7 @@ import {useChatStore} from '@/store/chatStore';
 import {useNotification} from '@/hooks/notificationContext';
 import {ShareDialog} from '@/components/ShareDialog';
 import {getInitials, stringToColor} from '@/utils/avatar';
+import {downscaleAvatar} from '@/utils/image';
 
 function ProfilePage() {
   const account = useChatStore((s) => s.account);
@@ -68,22 +69,13 @@ function ProfilePage() {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      if (file.size > 100_000) {
-        notify('Image too large. Please use an image under 100KB.', 'warning');
-        return;
+      try {
+        const dataUrl = await downscaleAvatar(file);
+        await setAccount({...account, avatar: dataUrl});
+        notify('Avatar updated!', 'success');
+      } catch {
+        notify('Failed to update avatar', 'error');
       }
-
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const data = reader.result as string;
-        try {
-          await setAccount({ ...account, avatar: data });
-          notify('Avatar updated!', 'success');
-        } catch {
-          notify('Failed to update avatar', 'error');
-        }
-      };
-      reader.readAsDataURL(file);
     },
     [account, setAccount, notify],
   );
@@ -112,7 +104,9 @@ function ProfilePage() {
       </Typography>
 
       <Card variant="outlined" sx={{ mb: 2 }}>
-        <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 3 }}>
+        <CardContent
+            sx={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 3}}
+        >
           {/* Avatar */}
           <Box sx={{ position: 'relative' }}>
             <Avatar
@@ -159,7 +153,9 @@ function ProfilePage() {
 
           {/* Name */}
           {editingName ? (
-            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', width: '100%', maxWidth: 280 }}>
+              <Box
+                  sx={{display: 'flex', gap: 0.5, alignItems: 'center', width: '100%', maxWidth: 280}}
+              >
               <TextField
                 size="small"
                 fullWidth
@@ -195,13 +191,23 @@ function ProfilePage() {
         <CardContent sx={{ p: 0 }}>
           {/* Peer ID */}
           <Box sx={{ px: 2.5, py: 2 }}>
-            <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+            <Typography
+                variant="caption"
+                color="text.secondary"
+                gutterBottom
+                sx={{display: 'block'}}
+            >
               Peer ID
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <Typography
                 variant="body2"
-                sx={{ fontFamily: 'monospace', fontSize: '0.8rem', wordBreak: 'break-all', flex: 1 }}
+                sx={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.8rem',
+                  wordBreak: 'break-all',
+                  flex: 1,
+                }}
               >
                 {account.id}
               </Typography>
@@ -237,4 +243,3 @@ function ProfilePage() {
 export const Route = createFileRoute('/profile')({
   component: ProfilePage,
 });
-
