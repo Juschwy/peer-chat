@@ -1,9 +1,9 @@
-import { Badge } from '@mui/material';
-import { UserAvatar } from './UserAvatar';
+import {Badge} from '@mui/material';
+import {UserAvatar} from './UserAvatar';
 
 interface OnlineAvatarProps {
   name: string;
-  avatar?: string;
+    avatar?: string | null;
   online: boolean;
   size?: number;
 }

@@ -1,16 +1,16 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { useState, useRef, useCallback } from 'react';
+import {createFileRoute} from '@tanstack/react-router';
+import {useCallback, useRef, useState} from 'react';
 import {
+  Avatar,
   Box,
-  Typography,
+  Button,
   Card,
   CardContent,
-  IconButton,
-  Tooltip,
-  TextField,
-  Button,
   Divider,
-  Avatar,
+  IconButton,
+  TextField,
+  Tooltip,
+  Typography,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import QrCode2Icon from '@mui/icons-material/QrCode2';
@@ -18,10 +18,10 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
-import { useChatStore } from '@/store/chatStore';
-import { useNotification } from '@/hooks/notificationContext';
-import { ShareDialog } from '@/components/ShareDialog';
-import { getInitials, stringToColor } from '@/utils/avatar';
+import {useChatStore} from '@/store/chatStore';
+import {useNotification} from '@/hooks/notificationContext';
+import {ShareDialog} from '@/components/ShareDialog';
+import {getInitials, stringToColor} from '@/utils/avatar';
 
 function ProfilePage() {
   const account = useChatStore((s) => s.account);
@@ -116,7 +116,7 @@ function ProfilePage() {
           {/* Avatar */}
           <Box sx={{ position: 'relative' }}>
             <Avatar
-              src={account.avatar}
+                src={account.avatar || undefined}
               sx={{
                 width: 96,
                 height: 96,

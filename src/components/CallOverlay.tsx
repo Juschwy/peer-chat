@@ -1,18 +1,11 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  Box,
-  Typography,
-  IconButton,
-  Avatar,
-} from '@mui/material';
+import {useEffect, useMemo, useRef, useState} from 'react';
+import {Avatar, Box, Dialog, DialogContent, IconButton, Typography,} from '@mui/material';
 import CallEndIcon from '@mui/icons-material/CallEnd';
 import CallIcon from '@mui/icons-material/Call';
 import VideocamIcon from '@mui/icons-material/Videocam';
-import { useChatStore } from '@/store/chatStore';
-import { connectionManager } from '@/connection/ConnectionManager';
-import { getInitials, stringToColor } from '@/utils/avatar';
+import {useChatStore} from '@/store/chatStore';
+import {connectionManager} from '@/connection/ConnectionManager';
+import {getInitials, stringToColor} from '@/utils/avatar';
 
 export function CallOverlay() {
   const activeCall = useChatStore((s) => s.activeCall);
@@ -117,7 +110,7 @@ export function CallOverlay() {
         {(!isVideo || isRinging) && (
           <>
             <Avatar
-              src={contact?.avatar}
+                src={contact?.avatar || undefined}
               sx={{ width: 80, height: 80, bgcolor: stringToColor(displayName), fontSize: 32 }}
             >
               {getInitials(displayName)}

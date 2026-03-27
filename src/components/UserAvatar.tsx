@@ -1,9 +1,9 @@
-import { Avatar as MuiAvatar } from '@mui/material';
-import { getInitials, stringToColor } from '@/utils/avatar';
+import {Avatar as MuiAvatar} from '@mui/material';
+import {getInitials, stringToColor} from '@/utils/avatar';
 
 interface UserAvatarProps {
   name: string;
-  avatar?: string;
+    avatar?: string | null;
   size?: number;
 }
 
